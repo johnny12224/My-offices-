@@ -1,0 +1,3451 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>המשרד הווירטואלי שלי — סוקרה, בוליביה</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Three.js r128 for Interactive 3D Virtual Office -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+  <!-- Google Fonts: Heebo & Assistant for crisp Hebrew typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700;800&family=Heebo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Heebo', 'Assistant', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+            display: ['Assistant', 'Heebo', 'sans-serif'],
+          },
+          colors: {
+            linen: '#F7F4EE',
+            parchment: '#EFEAE0',
+            ink: '#1E293B',
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    /* =====================================================================
+       ROOT VARIABLES & TIINY.HOST SAFE BOTTOM CLEARANCE
+       Reserves 96px at the very bottom by default so tiiny.host's ~75px
+       purple banner NEVER covers navigation, camera pills, or chat inputs.
+       ===================================================================== */
+    :root {
+      --tiiny-offset: 96px;
+      --header-h: 58px;
+      --nav-h: 64px;
+    }
+
+    body.tiiny-spacer-off {
+      --tiiny-offset: env(safe-area-inset-bottom, 0px);
+    }
+
+    * {
+      -webkit-tap-highlight-color: transparent;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background-color: #F7F4EE;
+      color: #1E293B;
+      font-family: 'Heebo', 'Assistant', sans-serif;
+      overflow-x: hidden;
+    }
+
+    /* Fullscreen 3D Viewport Layer */
+    #view-3d-wrapper {
+      position: fixed;
+      top: var(--header-h);
+      left: 0;
+      right: 0;
+      bottom: calc(var(--tiiny-offset) + var(--nav-h));
+      background: linear-gradient(180deg, #16202E 0%, #1F2D3D 100%);
+      overflow: hidden;
+      touch-action: none;
+    }
+
+    #office3dCanvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+      touch-action: none;
+    }
+
+    #office3dCanvas:active {
+      cursor: grabbing;
+    }
+
+    /* Projected 3D Floating Dark Nameplates (matching user's screenshot aesthetic) */
+    .floating-3d-label {
+      position: absolute;
+      transform: translate(-50%, -100%);
+      background: rgba(17, 24, 39, 0.9);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      color: #FFFFFF;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 9999px;
+      padding: 5px 11px;
+      font-size: 11.5px;
+      font-weight: 700;
+      white-space: nowrap;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      pointer-events: auto;
+      cursor: pointer;
+      transition: transform 0.16s ease, background-color 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
+      z-index: 15;
+      user-select: none;
+    }
+
+    .floating-3d-label:active {
+      transform: translate(-50%, -100%) scale(0.94);
+    }
+
+    .floating-3d-label.speaking {
+      background: rgba(217, 119, 6, 0.96);
+      border-color: #FDE68A;
+      box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.35), 0 10px 24px rgba(0, 0, 0, 0.4);
+      z-index: 20;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 9999px;
+      flex-shrink: 0;
+    }
+
+    /* Camera Preset Floating Bar inside 3D view */
+    .camera-presets-bar {
+      position: absolute;
+      bottom: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 22;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(15, 23, 42, 0.84);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      padding: 5px;
+      border-radius: 20px;
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+      max-width: calc(100vw - 20px);
+    }
+
+    .cam-preset-btn {
+      min-height: 38px;
+      padding: 6px 12px;
+      border-radius: 15px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #CBD5E1;
+      background: transparent;
+      border: none;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .cam-preset-btn.active {
+      background: #FFFFFF;
+      color: #0F172A;
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.22);
+    }
+
+    /* Fixed Bottom Navigation — Strictly ABOVE the tiiny.host banner */
+    #bottomNav {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: var(--tiiny-offset);
+      height: var(--nav-h);
+      z-index: 35;
+      background: rgba(255, 255, 255, 0.96);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-top: 1px solid #E7E2D8;
+      box-shadow: 0 -6px 24px rgba(15, 23, 42, 0.08);
+    }
+
+    /* Visual bottom clearance cushion below nav (keeps space cleanly reserved for tiiny banner) */
+    #tiinyClearanceBand {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: var(--tiiny-offset);
+      background: #F1ECE3;
+      border-top: 1px dashed #D6CFC3;
+      z-index: 34;
+      pointer-events: none;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: 6px;
+    }
+
+    body.tiiny-spacer-off #tiinyClearanceBand {
+      display: none;
+    }
+
+    /* Scrollable 2D views reserve generous clearance above nav + tiiny banner */
+    .scrollable-page {
+      padding-top: calc(var(--header-h) + 14px);
+      padding-bottom: calc(var(--tiiny-offset) + var(--nav-h) + 34px);
+      min-height: 100vh;
+    }
+
+    /* Slide-over Drawers & Modals ALWAYS stay completely above tiiny.host banner */
+    .safe-modal-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: var(--tiiny-offset);
+      z-index: 50;
+      background: rgba(15, 23, 42, 0.56);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+    }
+
+    /* Soundwave Speaking Animation */
+    @keyframes wavePulse {
+      0%, 100% { height: 4px; }
+      50% { height: 14px; }
+    }
+    .wave-1 { animation: wavePulse 0.6s ease-in-out infinite; }
+    .wave-2 { animation: wavePulse 0.6s ease-in-out 0.15s infinite; }
+    .wave-3 { animation: wavePulse 0.6s ease-in-out 0.3s infinite; }
+
+    /* Subtle scrollbar styling */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 9999px; }
+  </style>
+</head>
+<body class="selection:bg-indigo-100 selection:text-indigo-900">
+
+  <!-- ===================================================================
+       1. COMPACT TOP HEADER WITH DUAL VIEW MODE TOGGLE (3D / REGULAR)
+       =================================================================== -->
+  <header class="fixed top-0 inset-x-0 z-40 h-[58px] bg-white/95 backdrop-blur-md border-b border-stone-200/90 shadow-xs px-3 sm:px-5 flex items-center justify-between gap-2">
+    <!-- Brand & Compact Title -->
+    <div class="flex items-center gap-2 min-w-0">
+      <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-600 to-emerald-500 text-white font-display font-extrabold text-xs flex items-center justify-center shadow-sm shrink-0">
+        מש
+      </div>
+      <div class="min-w-0">
+        <h1 class="font-display font-extrabold text-sm sm:text-base text-slate-900 leading-tight truncate">
+          המשרד הווירטואלי שלי
+        </h1>
+        <div class="flex items-center gap-1.5 text-[10px] text-slate-500 leading-none mt-0.5">
+          <span id="aiModeDot" class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+          <span id="aiModeLabel" class="truncate">מנוע חכם פעיל</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dual View Mode Toggle Pill: 3D vs Regular -->
+    <div class="bg-stone-100 p-1 rounded-2xl border border-stone-200/90 flex items-center gap-1 shrink-0" role="tablist" aria-label="מצב תצוגה">
+      <button
+        id="modeBtn3D"
+        type="button"
+        class="min-h-[34px] px-2.5 sm:px-3 py-1 rounded-xl text-xs font-extrabold transition flex items-center gap-1 bg-slate-900 text-white shadow-sm"
+      >
+        <span>🏢</span>
+        <span>מצב 3D</span>
+      </button>
+      <button
+        id="modeBtnRegular"
+        type="button"
+        class="min-h-[34px] px-2.5 sm:px-3 py-1 rounded-xl text-xs font-bold transition flex items-center gap-1 text-slate-600 hover:text-slate-900"
+      >
+        <span>📱</span>
+        <span>מצב רגיל</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ===================================================================
+       2. MODE 1: INTERACTIVE 3D VIRTUAL OFFICE (Three.js r128)
+       =================================================================== -->
+  <section id="view-3d-wrapper" aria-label="משרד וירטואלי בתלת-ממד">
+    <!-- Three.js WebGL Canvas -->
+    <canvas id="office3dCanvas"></canvas>
+
+    <!-- Floating Projected Nameplates Container -->
+    <div id="labels3dLayer" class="absolute inset-0 pointer-events-none overflow-hidden"></div>
+
+    <!-- Compact Top-Right Floating Nutrition & Location Pill (Clickable for Meals/Trek) -->
+    <button
+      id="hudNutritionPill"
+      type="button"
+      class="absolute top-3 right-3 z-20 bg-slate-900/85 hover:bg-slate-900 text-white backdrop-blur-md border border-white/15 rounded-2xl px-3 py-2 text-[11px] sm:text-xs font-bold shadow-lg flex items-center gap-2 transition active:scale-95"
+      title="לחץ לצפייה בארוחות ובמצב יום טרק"
+    >
+      <span class="text-sky-300">📍 סוקרה</span>
+      <span class="text-slate-500">|</span>
+      <span id="hudCalText" class="tabular-nums">🔥 0/2,400</span>
+      <span class="text-slate-500">|</span>
+      <span id="hudProtText" class="tabular-nums">💪 0/180g</span>
+    </button>
+
+    <!-- Compact Top-Left Quick Trek Toggle / Gesture Hint -->
+    <div class="absolute top-3 left-3 z-20 flex flex-col items-end gap-1.5">
+      <button
+        id="hudTrekBtn"
+        type="button"
+        class="bg-slate-900/80 hover:bg-slate-900 text-slate-200 backdrop-blur-md border border-white/15 rounded-2xl px-2.5 py-2 text-[11px] font-bold shadow-lg flex items-center gap-1 transition active:scale-95"
+      >
+        <span>🏔️</span>
+        <span id="hudTrekLabel">רגיל</span>
+      </button>
+    </div>
+
+    <!-- Subtle Speaking / Conference Overlay Bar inside 3D Conference Mode -->
+    <div
+      id="hudConferenceQuickBar"
+      class="hidden absolute top-14 left-1/2 -translate-x-1/2 z-20 bg-amber-500/95 text-white backdrop-blur-md border border-amber-200/50 rounded-2xl px-3.5 py-2 shadow-xl flex items-center gap-2.5 max-w-[92vw]"
+    >
+      <span class="text-xs font-extrabold whitespace-nowrap">🏛️ חדר ישיבות פעיל</span>
+      <button
+        id="hudOpenConfChatBtn"
+        type="button"
+        class="bg-white text-amber-900 px-3 py-1 rounded-xl text-xs font-extrabold shadow-xs active:scale-95 transition whitespace-nowrap"
+      >
+        פתח דיון / צ׳ק-אין ←
+      </button>
+    </div>
+
+    <!-- 3 Camera View Preset Buttons Floating Safely Above Bottom Nav -->
+    <div class="camera-presets-bar" role="group" aria-label="זוויות מצלמה">
+      <button type="button" class="cam-preset-btn active" data-cam-preset="isometric">
+        <span>🗺️</span>
+        <span>מבט-על</span>
+      </button>
+      <button type="button" class="cam-preset-btn" data-cam-preset="hallway">
+        <span>🚶</span>
+        <span>מסדרון</span>
+      </button>
+      <button type="button" class="cam-preset-btn" data-cam-preset="conference">
+        <span>🏛️</span>
+        <span>חדר ישיבות</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- ===================================================================
+       3. MODE 2: REGULAR 2D MOBILE DASHBOARD ("מצב רגיל")
+       =================================================================== -->
+  <main id="view-regular" class="hidden scrollable-page max-w-4xl mx-auto px-3 sm:px-5 space-y-4">
+    <!-- Top Live Tracker Card -->
+    <section class="bg-white rounded-3xl border border-stone-200/90 p-4 shadow-sm space-y-3">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="inline-flex items-center gap-1 text-xs font-extrabold px-2.5 py-1 rounded-full bg-sky-50 text-sky-800 border border-sky-200">
+            📍 סוקרה, בוליביה
+          </span>
+          <span class="text-[11px] text-slate-500 font-medium">הגעה מקוצ׳במבה • גובה 2,800 מ׳</span>
+        </div>
+
+        <div class="flex items-center gap-1.5">
+          <button
+            id="regTrekToggleBtn"
+            type="button"
+            class="min-h-[34px] px-2.5 py-1 rounded-xl text-xs font-bold border transition flex items-center gap-1 bg-stone-100 text-slate-700 border-stone-200"
+          >
+            <span>🏔️</span>
+            <span id="regTrekLabel">מצב טרק: כבוי</span>
+          </button>
+          <button
+            id="regResetDayBtn"
+            type="button"
+            class="min-h-[34px] px-2.5 py-1 rounded-xl text-xs font-semibold bg-white hover:bg-stone-100 text-slate-600 border border-stone-200"
+            title="איפוס ליום חדש"
+          >
+            🔄 יום חדש
+          </button>
+        </div>
+      </div>
+
+      <!-- Calories & Protein Progress Bars -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-linen/90 rounded-2xl p-3 border border-stone-200/70">
+        <!-- Calories -->
+        <div class="space-y-1.5">
+          <div class="flex items-center justify-between text-xs">
+            <span class="font-extrabold text-slate-700">🔥 קלוריות היום</span>
+            <span class="font-extrabold text-slate-900 tabular-nums">
+              <span id="regCalVal">0</span> / <span id="regCalTarget">2,400</span> קק״ל
+            </span>
+          </div>
+          <div class="w-full h-2.5 bg-stone-200 rounded-full overflow-hidden">
+            <div id="regCalBar" class="h-full bg-gradient-to-l from-emerald-500 to-teal-400 rounded-full transition-all duration-300" style="width: 0%;"></div>
+          </div>
+          <div id="regCalRemain" class="text-[11px] text-slate-500">נותרו 2,400 קק״ל ליעד</div>
+        </div>
+
+        <!-- Protein -->
+        <div class="space-y-1.5">
+          <div class="flex items-center justify-between text-xs">
+            <span class="font-extrabold text-slate-700">💪 חלבון היום</span>
+            <span class="font-extrabold text-slate-900 tabular-nums">
+              <span id="regProtVal">0</span> / <span id="regProtTarget">180</span> גרם
+            </span>
+          </div>
+          <div class="w-full h-2.5 bg-stone-200 rounded-full overflow-hidden">
+            <div id="regProtBar" class="h-full bg-gradient-to-l from-sky-500 to-indigo-500 rounded-full transition-all duration-300" style="width: 0%;"></div>
+          </div>
+          <div id="regProtRemain" class="text-[11px] text-slate-500">נותרו 180 גרם חלבון</div>
+        </div>
+      </div>
+
+      <!-- Quick Action Row -->
+      <div class="flex items-center gap-2">
+        <button
+          id="regQuickMealBtn"
+          type="button"
+          class="flex-1 min-h-[42px] rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-extrabold text-xs sm:text-sm shadow-xs transition flex items-center justify-center gap-1.5"
+        >
+          <span>➕</span>
+          <span>ארוחה מהירה (דן)</span>
+        </button>
+        <button
+          id="regMealsLogBtn"
+          type="button"
+          class="min-h-[42px] px-3.5 rounded-2xl bg-linen hover:bg-parchment border border-stone-200 text-slate-700 font-bold text-xs transition flex items-center gap-1.5"
+        >
+          <span>🍽️</span>
+          <span>יומן (<span id="regMealsCount">0</span>)</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Prominent Conference Room Banner -->
+    <button
+      id="regEnterConferenceBtn"
+      type="button"
+      class="w-full text-right bg-gradient-to-l from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 active:scale-[0.99] text-white rounded-3xl p-4 shadow-md transition flex items-center justify-between gap-3"
+    >
+      <div class="space-y-0.5">
+        <div class="text-xs font-bold text-amber-100">🏛️ חדר הישיבות המרכזי</div>
+        <div class="font-display font-extrabold text-base sm:text-lg">כנס ישיבת צוות (/daily-checkin • /weekly-review)</div>
+        <div class="text-[11px] text-amber-50/90">בחר משתתפים והפעל דיון קבוצתי מסונכרן עם כל הצוות</div>
+      </div>
+      <div class="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center text-lg font-extrabold shrink-0">←</div>
+    </button>
+
+    <!-- 4 Agents Grid -->
+    <section class="space-y-2.5">
+      <div class="flex items-center justify-between px-1">
+        <h2 class="font-display font-extrabold text-base text-slate-900">צוות המשרד שלך (4 סוכנים)</h2>
+        <button id="switchTo3dFromRegBtn" type="button" class="text-xs font-bold text-indigo-600 hover:underline">עבור לתצוגת 3D ←</button>
+      </div>
+      <div id="regularAgentsGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <!-- Populated dynamically by JS -->
+      </div>
+    </section>
+
+    <!-- Recent Activity Preview -->
+    <section class="bg-white rounded-3xl border border-stone-200 p-4 shadow-xs space-y-2">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-extrabold text-slate-800">⚡ פעילות אחרונה ביומן המשרד</span>
+        <button id="regGoBrainBtn" type="button" class="text-xs font-bold text-indigo-600">לכל הקבצים ←</button>
+      </div>
+      <div id="regActivityList" class="space-y-1.5 text-xs text-slate-600"></div>
+    </section>
+  </main>
+
+  <!-- ===================================================================
+       4. TAB 2: CONFERENCE ROOM ("🏛️ ישיבות")
+       =================================================================== -->
+  <section id="view-conference" class="hidden scrollable-page max-w-4xl mx-auto px-3 sm:px-5 space-y-3">
+    <div class="bg-white rounded-3xl border border-stone-200 shadow-sm overflow-hidden flex flex-col">
+      <!-- Conference Header -->
+      <div class="p-4 bg-gradient-to-l from-amber-50 via-white to-orange-50/50 border-b border-stone-200 space-y-3">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 class="font-display font-extrabold text-base sm:text-lg text-slate-900 flex items-center gap-1.5">
+              <span>🏛️</span>
+              <span>חדר הישיבות המרכזי</span>
+            </h2>
+            <p class="text-xs text-slate-500">כל סוכן שנבחר עונה בתורו לפי הכללים והטון האישי שלו.</p>
+          </div>
+          <button
+            id="confJump3dBtn"
+            type="button"
+            class="min-h-[34px] px-3 py-1 rounded-xl bg-slate-900 text-white text-xs font-bold shadow-xs flex items-center gap-1.5"
+          >
+            <span>🏢</span>
+            <span>צפה ב-3D</span>
+          </button>
+        </div>
+
+        <!-- Participant Toggle Pills -->
+        <div class="flex flex-wrap items-center gap-1.5">
+          <span class="text-xs font-bold text-slate-600 ml-1">משתתפים:</span>
+          <div id="confParticipantsRow" class="flex flex-wrap items-center gap-1.5"></div>
+        </div>
+
+        <!-- Speaking Live Banner -->
+        <div id="confSpeakingBanner" class="hidden items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-100 text-amber-900 border border-amber-300 text-xs font-extrabold">
+          <div class="flex items-end gap-0.5 h-3.5">
+            <span class="w-1 bg-amber-600 rounded-full wave-1"></span>
+            <span class="w-1 bg-amber-600 rounded-full wave-2"></span>
+            <span class="w-1 bg-amber-600 rounded-full wave-3"></span>
+          </div>
+          <span id="confSpeakingText">מדבר כעת...</span>
+        </div>
+      </div>
+
+      <!-- Quick Command Chips -->
+      <div class="px-4 py-2.5 bg-linen/80 border-b border-stone-200 flex items-center gap-2 overflow-x-auto">
+        <button id="cmdDailyCheckin" type="button" class="min-h-[36px] px-3 py-1.5 rounded-xl bg-white hover:bg-amber-50 border border-amber-200 text-amber-900 font-extrabold text-xs shrink-0 shadow-2xs">
+          ☀️ /daily-checkin
+        </button>
+        <button id="cmdWeeklyReview" type="button" class="min-h-[36px] px-3 py-1.5 rounded-xl bg-white hover:bg-indigo-50 border border-indigo-200 text-indigo-900 font-extrabold text-xs shrink-0 shadow-2xs">
+          📊 /weekly-review
+        </button>
+        <button id="cmdRouteStrategy" type="button" class="min-h-[36px] px-3 py-1.5 rounded-xl bg-white hover:bg-emerald-50 border border-emerald-200 text-emerald-900 font-bold text-xs shrink-0 shadow-2xs">
+          🎯 אסטרטגיית מעבר לאויוני + תזונה
+        </button>
+        <button id="cmdClearConf" type="button" class="min-h-[36px] px-2.5 py-1.5 rounded-xl bg-white hover:bg-rose-50 border border-stone-200 text-slate-500 hover:text-rose-600 font-bold text-xs shrink-0">
+          🗑️ נקה
+        </button>
+      </div>
+
+      <!-- Conference Messages Feed -->
+      <div id="confMessagesFeed" class="p-4 space-y-3 max-h-[44vh] min-h-[210px] overflow-y-auto bg-[#FAF8F4]"></div>
+
+      <!-- Conference Input Form -->
+      <form id="confChatForm" class="p-3 bg-white border-t border-stone-200 flex items-center gap-2">
+        <input
+          id="confChatInput"
+          type="text"
+          required
+          autocomplete="off"
+          placeholder="העלה נושא לדיון קבוצתי..."
+          class="flex-1 min-h-[44px] bg-linen/70 border border-stone-300 focus:border-amber-500 focus:bg-white rounded-2xl px-3.5 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
+        />
+        <button
+          id="confSendBtn"
+          type="submit"
+          class="min-h-[44px] px-4 rounded-2xl bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-extrabold text-sm shadow-xs shrink-0"
+        >
+          דון ↵
+        </button>
+      </form>
+    </div>
+  </section>
+
+  <!-- ===================================================================
+       5. TAB 3: BRAIN, RULES & SETTINGS ("🧠 מוח והגדרות")
+       =================================================================== -->
+  <section id="view-brain" class="hidden scrollable-page max-w-4xl mx-auto px-3 sm:px-5 space-y-4">
+    <!-- Settings Card (Tiiny.host Spacer + Optional Gemini API Key) -->
+    <div class="bg-white rounded-3xl border border-stone-200 p-4 shadow-sm space-y-4">
+      <h2 class="font-display font-extrabold text-base text-slate-900">⚙️ הגדרות תצוגה וחיבור AI</h2>
+
+      <!-- Tiiny.host Spacer Toggle -->
+      <div class="flex items-center justify-between gap-3 bg-purple-50/80 border border-purple-200/80 rounded-2xl p-3">
+        <div>
+          <div class="text-xs sm:text-sm font-extrabold text-purple-950">🛡️ מרווח הגנה לפס של tiiny.host (96px)</div>
+          <div class="text-[11px] text-purple-800/80 mt-0.5">
+            מונע מהפס הסגול בתחתית tiiny.host להסתיר את תיבת הצ׳אט או סרגל הניווט. כבה רק אם תעבור לאחסון ללא פרסומות.
+          </div>
+        </div>
+        <label class="relative inline-flex items-center cursor-pointer shrink-0">
+          <input id="settingTiinyToggle" type="checkbox" checked class="sr-only peer" />
+          <div class="w-11 h-6 bg-stone-300 peer-focus:outline-none rounded-full peer peer-checked:after:-translate-x-full after:content-[''] after:absolute after:top-[2px] after:right-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+        </label>
+      </div>
+
+      <!-- Optional Gemini API Key -->
+      <div class="bg-linen/80 border border-stone-200 rounded-2xl p-3 space-y-2">
+        <div class="flex items-center justify-between gap-2">
+          <label for="settingApiKeyInput" class="text-xs font-extrabold text-slate-800">🔑 מפתח Gemini API (אופציונלי)</label>
+          <span id="apiKeyStatusBadge" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">מנוע מקומי חכם פעיל</span>
+        </div>
+        <p class="text-[11px] text-slate-500 leading-relaxed">
+          גם בלי מפתח, כל 4 הסוכנים עובדים מיידית ב-tiiny.host (כולל חישוב אוכל של דן וניתוב של רועי). אם תרצה תשובות AI חופשיות בענן, הדבק כאן מפתח מ-Google AI Studio — נשמר מקומית במכשיר שלך בלבד.
+        </p>
+        <div class="flex gap-2">
+          <input
+            id="settingApiKeyInput"
+            type="password"
+            dir="ltr"
+            placeholder="AIzaSy..."
+            class="flex-1 min-h-[40px] bg-white border border-stone-300 rounded-xl px-3 text-xs text-slate-900 focus:outline-none focus:border-indigo-500"
+          />
+          <button
+            id="saveApiKeyBtn"
+            type="button"
+            class="min-h-[40px] px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shrink-0"
+          >
+            שמור
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Brain Markdown Files Editor -->
+    <div class="bg-white rounded-3xl border border-stone-200 p-4 shadow-sm space-y-3">
+      <div class="flex items-center justify-between gap-2">
+        <div>
+          <h2 class="font-display font-extrabold text-base text-slate-900">🧠 קבצי המוח והחוקים (`CLAUDE.md` + `brain/`)</h2>
+          <p class="text-xs text-slate-500">נשמר אוטומטית בדפדפן ומשפיע ישירות על התנהגות הסוכנים.</p>
+        </div>
+        <span id="brainSavedToast" class="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full opacity-0 transition-opacity">נשמר ✓</span>
+      </div>
+
+      <div id="brainTabsRow" class="flex items-center gap-1.5 overflow-x-auto pb-1"></div>
+
+      <div class="flex items-center justify-between gap-2">
+        <span id="brainFileTitle" dir="ltr" class="text-xs font-mono font-bold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-lg">CLAUDE.md</span>
+        <button id="saveBrainBtn" type="button" class="min-h-[36px] px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs">
+          💾 שמור קובץ
+        </button>
+      </div>
+
+      <textarea
+        id="brainEditorTextarea"
+        rows="12"
+        class="w-full bg-linen/60 border border-stone-300 focus:border-indigo-500 rounded-2xl p-3 text-xs sm:text-sm text-slate-800 leading-relaxed focus:outline-none"
+      ></textarea>
+
+      <div class="pt-2 border-t border-stone-100 flex justify-end">
+        <button id="openFactoryResetBtn" type="button" class="text-xs font-bold text-rose-600 hover:bg-rose-50 px-3 py-1.5 rounded-xl">
+          ⚠️ איפוס כללי לברירת מחדל
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================================================================
+       6. FIXED BOTTOM NAVIGATION BAR (POSITIONED ABOVE TIINY.HOST BANNER)
+       =================================================================== -->
+  <nav id="bottomNav" aria-label="ניווט ראשי">
+    <div class="max-w-xl mx-auto h-full px-3 grid grid-cols-3 gap-2 items-center">
+      <button type="button" data-tab="office" class="nav-tab-btn min-h-[48px] rounded-2xl flex flex-col items-center justify-center gap-0.5 text-xs font-extrabold transition bg-indigo-50 text-indigo-700">
+        <span class="text-lg leading-none">🏢</span>
+        <span>משרד</span>
+      </button>
+      <button type="button" data-tab="conference" class="nav-tab-btn min-h-[48px] rounded-2xl flex flex-col items-center justify-center gap-0.5 text-xs font-bold transition text-slate-500 hover:bg-stone-100">
+        <span class="text-lg leading-none">🏛️</span>
+        <span>ישיבות</span>
+      </button>
+      <button type="button" data-tab="brain" class="nav-tab-btn min-h-[48px] rounded-2xl flex flex-col items-center justify-center gap-0.5 text-xs font-bold transition text-slate-500 hover:bg-stone-100">
+        <span class="text-lg leading-none">🧠</span>
+        <span>מוח והגדרות</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Visual Clearance Reserve Band below Nav for Tiiny.host Banner -->
+  <div id="tiinyClearanceBand" aria-hidden="true">
+    <span class="text-[10px] font-semibold text-stone-400">אזור שמור לפס התחתון של tiiny.host</span>
+  </div>
+
+  <!-- ===================================================================
+       7. AGENT DIRECT CHAT SLIDE-OVER DRAWER (SAFE ABOVE TIINY BANNER)
+       =================================================================== -->
+  <div id="agentChatDrawer" class="safe-modal-backdrop hidden items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-white w-full max-w-2xl h-[92%] sm:h-[88%] rounded-t-[26px] sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-stone-200">
+      <!-- Drawer Header -->
+      <div class="px-4 py-3 bg-linen/90 border-b border-stone-200 flex items-center justify-between gap-2 shrink-0">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div id="drawerAvatarBadge" class="w-10 h-10 rounded-2xl flex items-center justify-center text-white font-extrabold text-lg shadow-sm shrink-0"></div>
+          <div class="min-w-0">
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <h3 id="drawerAgentName" class="font-display font-extrabold text-sm sm:text-base text-slate-900 truncate"></h3>
+              <span id="drawerTonePill" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white border border-stone-200 text-slate-600"></span>
+            </div>
+            <p id="drawerAgentRole" class="text-[11px] text-slate-500 truncate"></p>
+          </div>
+        </div>
+        <button id="closeChatDrawerBtn" type="button" class="min-w-[38px] min-h-[38px] rounded-2xl bg-white hover:bg-stone-100 border border-stone-200 text-slate-700 font-extrabold text-sm shrink-0">
+          ✕
+        </button>
+      </div>
+
+      <!-- Contextual Control Strip (Dan Macros/Trek, Roee Auto-Dispatch, Tomer Route, Eitan Standby) -->
+      <div id="drawerContextStrip" class="px-3.5 py-2 bg-white border-b border-stone-200 flex flex-wrap items-center justify-between gap-2 text-xs shrink-0"></div>
+
+      <!-- Quick Prompts Strip -->
+      <div class="px-3.5 py-2 bg-linen/45 border-b border-stone-100 flex items-center gap-1.5 overflow-x-auto shrink-0">
+        <div id="drawerQuickPrompts" class="flex items-center gap-1.5"></div>
+      </div>
+
+      <!-- Messages Feed -->
+      <div id="drawerMessagesFeed" class="flex-1 overflow-y-auto p-3.5 space-y-3 bg-[#FAF8F4]"></div>
+
+      <!-- Typing Indicator -->
+      <div id="drawerTypingBar" class="hidden px-4 py-1.5 bg-[#FAF8F4] text-xs font-bold text-slate-500 items-center gap-2 shrink-0">
+        <div class="flex items-end gap-0.5 h-3.5">
+          <span class="w-1 bg-indigo-500 rounded-full wave-1"></span>
+          <span class="w-1 bg-indigo-500 rounded-full wave-2"></span>
+          <span class="w-1 bg-indigo-500 rounded-full wave-3"></span>
+        </div>
+        <span id="drawerTypingText">חושב וכותב...</span>
+      </div>
+
+      <!-- Chat Input Form — Completely Clear of Tiiny Banner -->
+      <form id="drawerChatForm" class="p-3 bg-white border-t border-stone-200 flex items-center gap-2 shrink-0">
+        <input
+          id="drawerChatInput"
+          type="text"
+          required
+          autocomplete="off"
+          placeholder="כתוב הודעה..."
+          class="flex-1 min-h-[44px] bg-linen/70 border border-stone-300 focus:border-indigo-500 focus:bg-white rounded-2xl px-3.5 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
+        />
+        <button
+          id="drawerSendBtn"
+          type="submit"
+          class="min-h-[44px] px-4 rounded-2xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-extrabold text-sm shadow-xs shrink-0"
+        >
+          שלח ↵
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===================================================================
+       8. MEALS LOG & QUICK MEAL MODAL (NO alert / confirm)
+       =================================================================== -->
+  <div id="mealsModal" class="safe-modal-backdrop hidden items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-white w-full max-w-lg rounded-t-[26px] sm:rounded-3xl shadow-2xl border border-stone-200 p-4 space-y-3.5 max-h-[86%] flex flex-col">
+      <div class="flex items-center justify-between border-b border-stone-200 pb-2.5">
+        <div>
+          <h3 class="font-display font-extrabold text-base text-slate-900">🍽️ יומן תזונה להיום — דן</h3>
+          <p id="mealsModalMeta" class="text-xs text-slate-500 mt-0.5"></p>
+        </div>
+        <button id="closeMealsModalBtn" type="button" class="min-w-[36px] min-h-[36px] rounded-xl bg-stone-100 text-slate-700 font-bold text-xs">✕</button>
+      </div>
+
+      <!-- Quick Add Meal Form inside Modal -->
+      <form id="quickAddMealForm" class="bg-emerald-50/80 border border-emerald-200 rounded-2xl p-3 space-y-2">
+        <div class="text-xs font-extrabold text-emerald-900">⚡ רישום ארוחה מהיר לדן</div>
+        <div class="flex gap-2">
+          <input
+            id="quickMealDescInput"
+            type="text"
+            required
+            placeholder="למשל: 250 גרם סטייק בקר, אורז וביצה..."
+            class="flex-1 min-h-[38px] bg-white border border-emerald-200 rounded-xl px-3 text-xs text-slate-900 focus:outline-none focus:border-emerald-500"
+          />
+          <button type="submit" class="min-h-[38px] px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shrink-0">
+            חשב ↵
+          </button>
+        </div>
+      </form>
+
+      <!-- Logged Meals List -->
+      <div id="mealsListContainer" class="flex-1 overflow-y-auto space-y-2"></div>
+
+      <!-- Inline Edit Meal Panel -->
+      <form id="editMealForm" class="hidden bg-indigo-50 border border-indigo-200 rounded-2xl p-3 space-y-2">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-extrabold text-indigo-900">✏️ עריכת ארוחה</span>
+          <button id="cancelEditMealBtn" type="button" class="text-xs font-bold text-slate-500">ביטול</button>
+        </div>
+        <input type="hidden" id="editMealId" />
+        <input id="editMealName" type="text" required class="w-full bg-white border border-indigo-200 rounded-xl px-3 py-1.5 text-xs" />
+        <div class="grid grid-cols-2 gap-2">
+          <input id="editMealCal" type="number" min="0" required placeholder="קלוריות" class="bg-white border border-indigo-200 rounded-xl px-3 py-1.5 text-xs" />
+          <input id="editMealProt" type="number" min="0" required placeholder="חלבון (ג׳)" class="bg-white border border-indigo-200 rounded-xl px-3 py-1.5 text-xs" />
+        </div>
+        <button type="submit" class="w-full min-h-[36px] rounded-xl bg-indigo-600 text-white font-bold text-xs">שמור שינוי</button>
+      </form>
+
+      <div class="pt-2 border-t border-stone-200 flex items-center justify-between gap-2">
+        <button id="mealsModalTrekBtn" type="button" class="min-h-[38px] px-3 rounded-xl bg-amber-100 text-amber-900 font-bold text-xs border border-amber-300">
+          🏔️ החלף מצב טרק
+        </button>
+        <button id="mealsModalChatDanBtn" type="button" class="flex-1 min-h-[38px] rounded-xl bg-slate-900 text-white font-bold text-xs">
+          💬 פתח שיחה מלאה עם דן
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================
+       9. CUSTOM CONFIRMATION MODAL (REPLACES confirm() / alert())
+       =================================================================== -->
+  <div id="confirmModal" class="safe-modal-backdrop hidden items-center justify-center p-4">
+    <div class="bg-white w-full max-w-sm rounded-3xl shadow-2xl border border-stone-200 p-5 space-y-4 text-center">
+      <div id="confirmIcon" class="w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 text-2xl flex items-center justify-center mx-auto">🌅</div>
+      <div class="space-y-1">
+        <h3 id="confirmTitle" class="font-display font-extrabold text-base text-slate-900">אישור פעולה</h3>
+        <p id="confirmBody" class="text-xs text-slate-600 leading-relaxed"></p>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <button id="confirmCancelBtn" type="button" class="min-h-[42px] rounded-xl bg-stone-100 hover:bg-stone-200 text-slate-700 font-bold text-xs">ביטול</button>
+        <button id="confirmOkBtn" type="button" class="min-h-[42px] rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs">אישור</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================
+       10. APPLICATION ENGINE (STATE, AI + LOCAL FALLBACK, 3D THREE.JS)
+       =================================================================== -->
+  <script>
+    (function () {
+      "use strict";
+
+      // ===============================================================
+      // A. CONSTANTS, AGENTS & INITIAL PRE-POPULATED STATE
+      // ===============================================================
+      const STORAGE_KEY = "virtual_office_v3_sucre_state";
+
+      const AGENTS = {
+        roee: {
+          id: "roee",
+          name: "רועי",
+          fullName: "רועי — מנהל המשרד",
+          role: "ניתוב בקשות משולבות לצוות ללא ביצוע עצמי",
+          roomSign: "ניהול וניתוב",
+          tone: "עברית קצרה ותכליתית",
+          dotColor: "#A855F7",
+          hexColor: 0x7C3AED,
+          badgeBg: "bg-purple-600",
+          softBg: "bg-purple-50",
+          softBorder: "border-purple-200",
+          softText: "text-purple-700",
+          emoji: "🟣",
+          statusText: "זמין לניתוב",
+          quickPrompts: [
+            { label: "🔀 אוכל + מעבר לאויוני", text: "אכלתי עכשיו 2 אמפנדס עוף וביצה, ותבדוק לי גם איך להמשיך מסוקרה לפוטוסי ואויוני." },
+            { label: "🔀 אימון + רפואה", text: "עשיתי היום אימון פלג גוף עליון 50 דקות, וגם תבדוק עם איתן מתי נפתחת ההרשמה לרפואה." }
+          ]
+        },
+        dan: {
+          id: "dan",
+          name: "דן",
+          fullName: "דן — כושר ותזונה",
+          role: "חישוב שמרני, חלבון ומעקב אימונים (2,400 / 2,900)",
+          roomSign: "כושר ותזונה",
+          tone: "עברית קצרה ותכליתית",
+          dotColor: "#10B981",
+          hexColor: 0x059669,
+          badgeBg: "bg-emerald-600",
+          softBg: "bg-emerald-50",
+          softBorder: "border-emerald-200",
+          softText: "text-emerald-700",
+          emoji: "🟢",
+          statusText: "מעקב פעיל",
+          quickPrompts: [
+            { label: "🥩 סטייק + אורז", text: "אכלתי 250 גרם סטייק בקר, כוס אורז וסלט בסוקרה." },
+            { label: "🍳 3 ביצים + אבוקדו", text: "אכלתי 3 ביצים מקושקשות, חצי אבוקדו ו-2 פרוסות לחם." },
+            { label: "🏋️ תיעוד אימון", text: "סיימתי אימון כוח פלג גוף עליון (בנץ׳, פולי עליון, כתף אחורית) 55 דקות." }
+          ]
+        },
+        tomer: {
+          id: "tomer",
+          name: "תומר",
+          fullName: "תומר — טיול ומעברים",
+          role: "סוקרה, בוליביה ← פוטוסי ← סלאר דה אויוני ← ארגנטינה",
+          roomSign: "טיול ומעברים",
+          tone: "עברית קצרה ותכליתית",
+          dotColor: "#F97316",
+          hexColor: 0xEA580C,
+          badgeBg: "bg-orange-500",
+          softBg: "bg-orange-50",
+          softBorder: "border-orange-200",
+          softText: "text-orange-700",
+          emoji: "🟠",
+          statusText: "📍 סוקרה",
+          quickPrompts: [
+            { label: "🚌 סוקרה ← פוטוסי / אויוני", text: "תן לי 2 אופציות למעבר מסוקרה לפוטוסי או ישירות לסלאר דה אויוני, עם זמנים ועלות ל-TravelSpend." },
+            { label: "🏔️ טרק מרגואה בסוקרה", text: "בדוק לי אופציות לטרק מכתש מרגואה מסוקרה ומה צריך לוודא בשטח." },
+            { label: "🇦🇷 מעבר לארגנטינה", text: "איך הכי חכם להמשיך אחרי סלאר דה אויוני לכיוון צפון ארגנטינה?" }
+          ]
+        },
+        eitan: {
+          id: "eitan",
+          name: "איתן",
+          fullName: "איתן — אקדמיה ורפואה",
+          role: "קבלה למסלול השש-שנתי לרפואה בישראל (לפי בקשה בלבד)",
+          roomSign: "אקדמיה ורפואה",
+          tone: "עברית רשמית ומקצועית",
+          dotColor: "#3B82F6",
+          hexColor: 0x2563EB,
+          badgeBg: "bg-blue-600",
+          softBg: "bg-blue-50",
+          softBorder: "border-blue-200",
+          softText: "text-blue-700",
+          emoji: "🔵",
+          statusText: "⏸️ בהמתנה שקטה",
+          quickPrompts: [
+            { label: "📋 מועדי הרשמה לרפואה", text: "אבקש סקירה תמציתית של לוחות הזמנים ומועדי ההרשמה למסלול השש-שנתי לרפואה." },
+            { label: "📝 תכנון מועד פסיכומטרי", text: "אבקש סיכום קצר לגבי היערכות לשיפור הפסיכומטרי לאחר החזרה מהטיול." }
+          ]
+        }
+      };
+
+      const DEFAULT_FILES = {
+        "CLAUDE.md": `# CLAUDE.md — חוקי המשרד הווירטואלי
+
+## מצב נוכחי ומטרות
+- מיקום נוכחי: סוקרה, בוליביה (לאחר מעבר מקוצ׳במבה). המשך מתוכנן: פוטוסי, סלאר דה אויוני, מעבר לארגנטינה.
+- יעד תזונה ביום רגיל: 2,400 קק״ל ו-180 גרם חלבון.
+- יעד תזונה ביום טרק: 2,900 קק״ל ו-180 גרם חלבון (ללא גירעון או גירעון קטן).
+- שגרת אימונים: 3 אימוני פלג גוף עליון ו-2 רגליים בשבוע (ללא שינוי תוכנית ללא אישור).
+
+## חוקי ברזל לכל הסוכנים
+1. אין לשנות תוכנית אימונים או יעדי תזונה ללא אישור מפורש.
+2. אין לבצע רכישות, הזמנות, מחיקות או לקבוע עובדות בשטח ללא אישור ואימות מקומי.
+3. טון עבודה: רועי, דן ותומר — עברית קצרה ותכליתית (עד 5 שורות). איתן — עברית רשמית ומקצועית, פועל רק לפי פנייה יזומה.`,
+
+        "brain/tasks-and-ideas.md": `# משימות ורעיונות פתוחות
+
+## דן — כושר ותזונה
+- [x] נעילת יעדים: 2,400 קק״ל / 180 ג׳ חלבון (2,900 ביום טרק).
+- [ ] מעקב ארוחות יומי בסוקרה בחישוב שמרני.
+
+## תומר — טיול ומעברים
+- [x] מעבר מקוצ׳במבה לסוקרה (2,800 מ׳).
+- [ ] תכנון המשך לפוטוסי וסלאר דה אויוני (רישום עלויות ב-TravelSpend).
+- [ ] בדיקת מעבר הגבול מבוליביה לארגנטינה.
+
+## איתן — אקדמיה ורפואה (בהמתנה שקטה)
+- [ ] ריכוז מועדי הרשמה לשנת הלימודים האקדמית ומועד הפסיכומטרי (רק לפי פנייה).`,
+
+        "brain/lessons-learned.md": `# לקחים שוטפים (מה עובד)
+- דיווחים תמציתיים של עד 5 שורות שנוחים לקריאה מהירה באייפון.
+- חישוב שמרני לאוכל רחוב ומסעדות בדרום אמריקה (כולל שמן בישול ורטבים).
+- תמיד 2 חלופות ברורות לכל מעבר + ציון מפורש של מה שחייבים לוודא בטרמינל.
+- מרווח הגנה של 96px בתחתית המסך לעבודה נקייה על tiiny.host.`,
+
+        "brain/activity-log.md": `# יומן פעילות צוות
+- [היום] [מערכת] המשרד הווירטואלי התלת-ממדי עלה לאוויר עם 3 זוויות מצלמה ומצב רגיל.
+- [היום] [דן] יעדי התזונה מעודכנים ל-2,400 קק״ל ו-180 ג׳ חלבון (2,900 ביום טרק).
+- [היום] [תומר] מיקום עודכן לסוקרה, בוליביה (הגעה מקוצ׳במבה).`
+      };
+
+      function createDefaultState() {
+        return {
+          viewMode: "3d", // '3d' | 'regular'
+          activeTab: "office", // 'office' | 'conference' | 'brain'
+          tiinySpacerEnabled: true,
+          userApiKey: "",
+          roeeAutoDispatch: true,
+          nutrition: {
+            isTrekDay: false,
+            meals: [] // { id, name, calories, protein, time }
+          },
+          chats: {
+            roee: [
+              {
+                id: "roee-init",
+                sender: "agent",
+                text: "היי, אני רועי — מנהל המשרד.\nזרוק לי בקשה כללית או משולבת ואפצל אותה כלשונה לדן, תומר או איתן בלי לגעת בתוכן.",
+                time: "עכשיו",
+                routedTasks: []
+              }
+            ],
+            dan: [
+              {
+                id: "dan-init",
+                sender: "agent",
+                text: "יעד היום נעול: 2,400 קק״ל ו-180 ג׳ חלבון (2,900 קק״ל ביום טרק).\nכתוב מה אכלת או איזה אימון עשית — אחשב בגישה שמרנית ואעדכן את המדדים למעלה מיד.",
+                time: "עכשיו"
+              }
+            ],
+            tomer: [
+              {
+                id: "tomer-init",
+                sender: "agent",
+                text: "הגעת לסוקרה (2,800 מ׳) מקוצ׳במבה — נקודת התאוששות מצוינת.\nתגיד מתי ממשיכים לפוטוסי / סלאר דה אויוני או ארגנטינה ואתן 2 חלופות מסודרות עם מה שחובה לוודא בשטח.",
+                time: "עכשיו"
+              }
+            ],
+            eitan: [
+              {
+                id: "eitan-init",
+                sender: "agent",
+                text: "שלום רב. שולחן הייעוץ האקדמי לקבלה ללימודי רפואה נמצא בהמתנה שקטה לאורך הטיול.\nבכל עת שתבקש לברר מועדי הרשמה, חישובי סכם או היערכות לפסיכומטרי — אנא פנה אליי ישירות ואציג סקירה מסודרת.",
+                time: "עכשיו"
+              }
+            ]
+          },
+          conference: {
+            participants: ["roee", "dan", "tomer"],
+            messages: [
+              {
+                id: "conf-init",
+                senderType: "system",
+                senderId: "system",
+                senderName: "חדר ישיבות",
+                text: "ברוך הבא לחדר הישיבות! בחר משתתפים למעלה והרץ /daily-checkin, /weekly-review או כל נושא משותף.",
+                time: "עכשיו"
+              }
+            ]
+          },
+          files: { ...DEFAULT_FILES }
+        };
+      }
+
+      // Safe localStorage load/save
+      function loadState() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (!raw) return createDefaultState();
+          const parsed = JSON.parse(raw);
+          const def = createDefaultState();
+          return {
+            ...def,
+            ...parsed,
+            nutrition: { ...def.nutrition, ...(parsed.nutrition || {}) },
+            chats: { ...def.chats, ...(parsed.chats || {}) },
+            conference: { ...def.conference, ...(parsed.conference || {}) },
+            files: { ...def.files, ...(parsed.files || {}) }
+          };
+        } catch (err) {
+          return createDefaultState();
+        }
+      }
+
+      function saveState() {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        } catch (err) {
+          // Ignore quota or sandboxed iframe storage blocks gracefully
+        }
+      }
+
+      let state = loadState();
+      let activeChatAgentId = null;
+      let activeBrainFile = "CLAUDE.md";
+      let speakingAgentId = null;
+      let isConferenceBusy = false;
+      let confirmCallback = null;
+
+      // ===============================================================
+      // B. HELPER FUNCTIONS
+      // ===============================================================
+      function getNowTime() {
+        return new Date().toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
+      }
+
+      function escapeHtml(str) {
+        return String(str || "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      function getTotals() {
+        const targetCal = state.nutrition.isTrekDay ? 2900 : 2400;
+        const targetProt = 180;
+        let cal = 0;
+        let prot = 0;
+        for (const m of state.nutrition.meals) {
+          cal += Number(m.calories) || 0;
+          prot += Number(m.protein) || 0;
+        }
+        return {
+          cal,
+          prot,
+          targetCal,
+          targetProt,
+          remCal: targetCal - cal,
+          remProt: targetProt - prot
+        };
+      }
+
+      function appendLog(actor, line) {
+        const key = "brain/activity-log.md";
+        const cur = state.files[key] || "# יומן פעילות צוות\n";
+        const clean = String(line || "").replace(/\s+/g, " ").trim();
+        const lines = cur.split("\n");
+        lines.splice(1, 0, `- [${getNowTime()}] [${actor}] ${clean}`);
+        state.files[key] = lines.slice(0, 50).join("\n");
+      }
+
+      function openConfirm({ icon, title, body, okLabel = "אישור", onConfirm }) {
+        document.getElementById("confirmIcon").textContent = icon || "ℹ️";
+        document.getElementById("confirmTitle").textContent = title;
+        document.getElementById("confirmBody").textContent = body;
+        document.getElementById("confirmOkBtn").textContent = okLabel;
+        confirmCallback = onConfirm;
+        const modal = document.getElementById("confirmModal");
+        modal.classList.remove("hidden");
+        modal.classList.add("flex");
+      }
+
+      function closeConfirm() {
+        confirmCallback = null;
+        const modal = document.getElementById("confirmModal");
+        modal.classList.add("hidden");
+        modal.classList.remove("flex");
+      }
+
+      // ===============================================================
+      // C. SMART BUILT-IN LOCAL ENGINE + GEMINI API INTEGRATION
+      // ===============================================================
+      const BUILTIN_ENV_KEY = ""; // Runtime key if available
+
+      function getEffectiveApiKey() {
+        return (state.userApiKey || "").trim() || BUILTIN_ENV_KEY;
+      }
+
+      async function callGeminiIfAvailable({ systemInstruction, userPrompt, responseSchema = null }) {
+        const key = getEffectiveApiKey();
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${encodeURIComponent(key)}`;
+        const payload = {
+          contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+          systemInstruction: { parts: [{ text: systemInstruction }] }
+        };
+        if (responseSchema) {
+          payload.generationConfig = {
+            responseMimeType: "application/json",
+            responseSchema
+          };
+        }
+
+        const delays = [800, 1600];
+        let lastErr = null;
+        for (let i = 0; i <= delays.length; i++) {
+          try {
+            const res = await fetch(endpoint, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload)
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const json = await res.json();
+            const text = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (!text) throw new Error("Empty Gemini text");
+            return text;
+          } catch (err) {
+            lastErr = err;
+            // On 400/401/403 (missing key on tiiny.host), fail fast to local engine
+            if (String(err.message).includes("400") || String(err.message).includes("401") || String(err.message).includes("403")) {
+              throw err;
+            }
+            if (i < delays.length) {
+              await new Promise((r) => setTimeout(r, delays[i]));
+            }
+          }
+        }
+        throw lastErr;
+      }
+
+      function buildSharedPromptContext() {
+        const t = getTotals();
+        const mealNames = state.nutrition.meals.length
+          ? state.nutrition.meals.map((m) => `${m.name} (${m.calories} קק"ל, ${m.protein}ג' חלבון)`).join(" | ")
+          : "טרם נרשמו ארוחות היום";
+        return `
+=== חוקי המשרד (CLAUDE.md) ===
+${state.files["CLAUDE.md"]}
+
+=== משימות פתוחות ===
+${state.files["brain/tasks-and-ideas.md"]}
+
+=== מצב חי היום ===
+מיקום: סוקרה, בוליביה (אחרי מעבר מקוצ'במבה).
+מצב תזונה: ${state.nutrition.isTrekDay ? "יום טרק (2,900 קק\"ל, 180ג' חלבון)" : "יום רגיל (2,400 קק\"ל, 180ג' חלבון)"}.
+צריכה עד כה: ${t.cal} קק"ל (נותרו ${t.remCal}) | ${t.prot}ג' חלבון (נותרו ${t.remProt}ג').
+ארוחות היום: ${mealNames}.`;
+      }
+
+      // ---- Local Smart Food Parser for Dan (Conservative South America estimates) ----
+      const FOOD_DB = [
+        { keys: ["פיקה מאצ'ו", "פיקה מאצו", "pique macho"], name: "פיקה מאצ׳ו", cal: 950, prot: 46, unit: "מנה" },
+        { keys: ["אמפנדה", "אמפנדס", "סלטניה", "saltena", "empanada"], name: "אמפנדה / סלטניה", cal: 290, prot: 11, unit: "יחידה" },
+        { keys: ["המבורגר", "בורגר", "burger"], name: "המבורגר בקר", cal: 680, prot: 36, unit: "מנה" },
+        { keys: ["סטייק", "אנטריקוט", "בקר", "אסאדו", "בשר", "steak", "beef"], name: "מנת בקר / סטייק", cal: 460, prot: 44, unit: "מנה" },
+        { keys: ["עוף", "חזה עוף", "פרגית", "פולו", "pollo", "chicken"], name: "מנת עוף בגריל", cal: 360, prot: 42, unit: "מנה" },
+        { keys: ["ביצים", "ביצה", "חביתה", "מקושקשת", "egg"], name: "ביצה", cal: 85, prot: 6.5, unit: "יחידה" },
+        { keys: ["שייק", "אבקת חלבון", "חלבון", "whey", "shake"], name: "שייק חלבון", cal: 140, prot: 25, unit: "מנה" },
+        { keys: ["טונה", "tuna"], name: "פחית טונה", cal: 170, prot: 28, unit: "יחידה" },
+        { keys: ["סלמון", "דג", "פורל", "טרוצ'ה", "trucha", "salmon"], name: "מנת דג / פורל", cal: 340, prot: 36, unit: "מנה" },
+        { keys: ["יוגורט", "yogurt"], name: "יוגורט", cal: 150, prot: 12, unit: "גביע" },
+        { keys: ["קוקוס", "מי קוקוס", "coconut"], name: "קוקוס טרי", cal: 110, prot: 2, unit: "יחידה" },
+        { keys: ["אורז", "rice", "arroz"], name: "אורז", cal: 240, prot: 4.5, unit: "כוס" },
+        { keys: ["קינואה", "quinoa"], name: "קינואה", cal: 230, prot: 8, unit: "כוס" },
+        { keys: ["צ'יפס", "ציפס", "תפוחי אדמה", "תפוח אדמה", "fries", "papa"], name: "תפוחי אדמה / צ׳יפס", cal: 330, prot: 4, unit: "מנה" },
+        { keys: ["אבוקדו", "פלטה", "avocado", "palta"], name: "אבוקדו", cal: 180, prot: 2, unit: "חצי" },
+        { keys: ["לחם", "פרוסות", "פרוסה", "טוסט", "פיתה", "לחמניה", "bread"], name: "לחם / טוסט", cal: 110, prot: 3.5, unit: "פרוסה" },
+        { keys: ["פסטה", "ספגטי", "pasta"], name: "פסטה", cal: 380, prot: 12, unit: "צלחת" },
+        { keys: ["שיבולת שועל", "דייסה", "oats"], name: "שיבולת שועל", cal: 260, prot: 9, unit: "קערה" },
+        { keys: ["בננה", "תפוח", "פרי", "banana"], name: "פרי", cal: 105, prot: 1, unit: "יחידה" },
+        { keys: ["גבינה", "קוטג'", "קוטג", "cheese"], name: "גבינה / קוטג׳", cal: 180, prot: 16, unit: "מנה" },
+        { keys: ["סלט", "ירקות", "salad"], name: "סלט (כולל שמן)", cal: 110, prot: 2, unit: "מנה" },
+        { keys: ["פיצה", "pizza"], name: "משולש פיצה", cal: 290, prot: 11, unit: "משולש" },
+        { keys: ["שניצל", "מילנסה", "milanesa"], name: "מילנסה / שניצל", cal: 520, prot: 34, unit: "מנה" },
+        { keys: ["בוטנים", "שקדים", "אגוזים", "חמאת בוטנים"], name: "אגוזים / חמאת בוטנים", cal: 210, prot: 7, unit: "מנה" }
+      ];
+
+      function parseLocalMeal(text) {
+        const lower = text.toLowerCase();
+        // Check if this is purely a workout or question rather than food
+        const workoutWords = ["אימון", "חדר כושר", "משקולות", "בנץ", "פולי", "לג פרס", "סקוואט", "ריצה", "סטפר", "כוח", "רגליים", "פלג גוף"];
+        const mealTriggers = ["אכלתי", "שתיתי", "ארוחה", "צלחת", "מנה", "גרם", "כוס", "פרוסות", "בוקר", "צהריים", "ערב", "נשנשתי"];
+
+        let totalCal = 0;
+        let totalProt = 0;
+        const matchedNames = [];
+
+        for (const item of FOOD_DB) {
+          const hitKey = item.keys.find((k) => lower.includes(k));
+          if (!hitKey) continue;
+
+          // Look for quantity right before the keyword (e.g. "3 ביצים", "250 גרם סטייק", "חצי אבוקדו")
+          let mult = 1;
+          const idx = lower.indexOf(hitKey);
+          const before = lower.slice(Math.max(0, idx - 18), idx);
+
+          const gramMatch = before.match(/(\d{2,4})\s*(גרם|ג'|ג|g)/);
+          if (gramMatch) {
+            const grams = parseInt(gramMatch[1], 10);
+            if (grams >= 50 && grams <= 1000) {
+              mult = grams / 200; // Base portion ~200g cooked meat/carb
+            }
+          } else if (before.includes("חצי")) {
+            mult = item.unit === "חצי" ? 1 : 0.5;
+          } else if (before.includes("כפול") || before.includes("דאבל")) {
+            mult = 1.8;
+          } else {
+            const numMatch = before.match(/(\d+(?:\.\d+)?)\s*$/);
+            if (numMatch) {
+              const n = parseFloat(numMatch[1]);
+              if (n > 0 && n <= 12) mult = n;
+            }
+          }
+
+          totalCal += Math.round(item.cal * mult);
+          totalProt += Math.round(item.prot * mult);
+          matchedNames.push(item.name);
+        }
+
+        // Add conservative South America cooking oil buffer (+60 kcal) for restaurant/cooked plates
+        if (matchedNames.length > 0 && (lower.includes("מסעדה") || lower.includes("מטוגן") || lower.includes("מקומי") || matchedNames.length >= 2)) {
+          totalCal += 65;
+        }
+
+        const isWorkout = workoutWords.some((w) => lower.includes(w)) && matchedNames.length === 0;
+        const isMeal = matchedNames.length > 0 || (mealTriggers.some((w) => lower.includes(w)) && !isWorkout && !lower.includes("מה המצב") && !lower.includes("כמה נשאר"));
+
+        if (isMeal && matchedNames.length === 0) {
+          // Generic conservative fallback meal
+          totalCal = 480;
+          totalProt = 24;
+          matchedNames.push("ארוחה מקומית (הערכה שמרנית)");
+        }
+
+        return {
+          isMeal,
+          isWorkout,
+          mealName: matchedNames.slice(0, 3).join(" + "),
+          calories: totalCal,
+          protein: totalProt
+        };
+      }
+
+      function runLocalFallback(agentId, userText) {
+        const lower = userText.toLowerCase();
+        const t = getTotals();
+
+        // 1. ROEE (Router)
+        if (agentId === "roee") {
+          const danKeys = ["אכלתי", "קלוריות", "חלבון", "אימון", "כושר", "סטייק", "עוף", "אמפנד", "ביצ", "המבורגר", "שייק", "משקל", "טרק", "ארוחה", "אוכל", "קוקוס"];
+          const tomerKeys = ["סוקרה", "פוטוסי", "אויוני", "סלאר", "בוליביה", "ארגנטינה", "אוטובוס", "טיסה", "מעבר", "מלון", "הוסטל", "מסלול", "מרגואה", "טיול", "טרמינל", "לה פאס"];
+          const eitanKeys = ["רפואה", "פסיכומטרי", "הרשמה", "סכם", "בגרות", "אוניברסיטה", "לימודים", "פקולטה", "איתן", "מבחן"];
+
+          const tasks = [];
+          const hasDan = danKeys.some((k) => lower.includes(k));
+          const hasTomer = tomerKeys.some((k) => lower.includes(k));
+          const hasEitan = eitanKeys.some((k) => lower.includes(k));
+
+          if (hasDan) tasks.push({ agentId: "dan", verbatimTask: userText });
+          if (hasTomer) tasks.push({ agentId: "tomer", verbatimTask: userText });
+          if (hasEitan) tasks.push({ agentId: "eitan", verbatimTask: userText });
+
+          if (tasks.length === 0) {
+            return {
+              replyText: "לא זיהיתי לאיזה מחלקה לשייך את ההודעה.\nציין אם זה לתזונה/כושר (דן), מסלול ומעברים (תומר) או רפואה (איתן) ואעביר מיד.",
+              routedTasks: [],
+              activityLogLine: "ביקש הבהרת ניתוב מהמשתמש."
+            };
+          }
+
+          const names = tasks.map((x) => AGENTS[x.agentId].name).join(" ו-");
+          return {
+            replyText: `הבקשה פוצלה והועברה כלשונה אל: ${names}.\n${state.roeeAutoDispatch ? "הפעלתי אותם אוטומטית — התשובות יופיעו מיד למטה." : "לחץ על הכפתור למטה להפעלת כל סוכן."}`,
+            routedTasks: tasks,
+            activityLogLine: `ניתב בקשה אל ${names}.`
+          };
+        }
+
+        // 2. DAN (Fitness & Nutrition)
+        if (agentId === "dan") {
+          const parsed = parseLocalMeal(userText);
+          if (parsed.isMeal) {
+            const newCal = t.cal + parsed.calories;
+            const newProt = t.prot + parsed.protein;
+            const remCal = t.targetCal - newCal;
+            const remProt = t.targetProt - newProt;
+            return {
+              isMeal: true,
+              mealName: parsed.mealName,
+              calories: parsed.calories,
+              protein: parsed.protein,
+              replyText: `נרשם: ${parsed.mealName}.\nהערכה שמרנית: ~${parsed.calories} קק״ל | ~${parsed.protein} ג׳ חלבון (כולל מרווח שמן בישול).\nמצטבר היום: ${newCal}/${t.targetCal} קק״ל | ${newProt}/${t.targetProt} ג׳ חלבון.\nיתרה לסגירת היום: ${remCal >= 0 ? remCal + " קק״ל" : "חריגה של " + Math.abs(remCal) + " קק״ל"} ו-${Math.max(0, remProt)} ג׳ חלבון.`,
+              activityLogLine: `רשם ${parsed.mealName} (${parsed.calories} קק״ל, ${parsed.protein}ג׳ חלבון).`
+            };
+          }
+          if (parsed.isWorkout) {
+            return {
+              isMeal: false,
+              mealName: "",
+              calories: 0,
+              protein: 0,
+              replyText: `אימון תועד בשולחן העבודה! שומר על התוכנית הקבועה שלך בלי שינויים.\nמאזן היום כרגע: ${t.cal}/${t.targetCal} קק״ל ו-${t.prot}/${t.targetProt} ג׳ חלבון.\nדגש אחרי אימון: סגור מנת חלבון איכותית של 40–50 ג׳ (עוף/בקר/ביצים) בשעתיים הקרובות.`,
+              activityLogLine: "תיעד אימון כוח שוטף ללא שינוי תוכנית."
+            };
+          }
+          return {
+            isMeal: false,
+            mealName: "",
+            calories: 0,
+            protein: 0,
+            replyText: `סטטוס היום (${state.nutrition.isTrekDay ? "מצב טרק" : "יום רגיל"}): ${t.cal}/${t.targetCal} קק״ל | ${t.prot}/${t.targetProt} ג׳ חלבון.\nיתרה: ${Math.max(0, t.remCal)} קק״ל ו-${Math.max(0, t.remProt)} ג׳ חלבון.\nטיפ לסוקרה: סטייק בקר או חזה עוף בגריל במסעדה מקומית סוגרים מהר 45–55 ג׳ חלבון נקי.`,
+            activityLogLine: "הציג סטטוס קלוריות וחלבון יומי."
+          };
+        }
+
+        // 3. TOMER (Travel Scout)
+        if (agentId === "tomer") {
+          if (lower.includes("מרגואה") || lower.includes("maragua") || lower.includes("טרק")) {
+            return {
+              replyText: `• אופציה 1 (טרק יומי מאורגן מסוקרה): ~7–8 שעות (שביל האינקה + מכתש מרגואה), כ-250–350 בוליביאנו ל-TravelSpend.\n• אופציה 2 (יומיים עם לינה בכפר): קצב רגוע יותר, כ-500–650 בוליביאנו כולל אוכל.\n• חובה לוודא בשטח: מזג אוויר/גשם בעונה הזו וגודל הקבוצה בסוכנות במרכז סוקרה.`,
+              activityLogLine: "הציג 2 חלופות לטרק מרגואה מסוקרה."
+            };
+          }
+          if (lower.includes("ארגנטינה") || lower.includes("סלטה") || lower.includes("גבול")) {
+            return {
+              replyText: `• אופציה 1 (מאויני דרך גבול Villazón–La Quiaca): אוטובוס לילה/בוקר מאויוני לוויאזון (5–6 שעות, ~60–90 BOB), חצייה רגלית והמשך לסלטה/חוחוי.\n• אופציה 2 (מעבר דרך סן פדרו דה אטקמה בסיום טור הסלאר): מעבר נוח ומבוקש אם משלבים צ׳ילה לפני ארגנטינה.\n• חובה לוודא בשטח: שעות פתיחת מעבר הגבול ועדכון שאין חסימות כבישים (Bloqueos).`,
+              activityLogLine: "בדק חלופות מעבר מבוליביה לארגנטינה."
+            };
+          }
+          return {
+            replyText: `• אופציה 1 (סוקרה ← פוטוסי ← אויוני): 3 שעות לפוטוסי (~25–35 BOB) + 4 שעות לאויוני (~40–50 BOB) — נוח אם עוצרים לפוטוסי.\n• אופציה 2 (אוטובוס ישיר סוקרה ← אויוני): כ-7–8 שעות (ערב/לילה), ~70–100 BOB לחיסכון בזמן ל-TravelSpend.\n• חובה לוודא בשטח: שעות יציאה מדויקות בטרמינל בסוקרה ושאין חסימות כבישים בדרך.`,
+            activityLogLine: "הציג חלופות מעבר מסוקרה לפוטוסי ואויוני."
+          };
+        }
+
+        // 4. EITAN (Academic & Medical Advisor — Formal Hebrew)
+        if (lower.includes("פסיכומטרי")) {
+          return {
+            replyText: `שלום רב. בהתאם לנתונים הקיימים בתיק, היעד המוגדר הוא היערכות מסודרת למועד הבחינה הפסיכומטרית לאחר החזרה מהטיול (דגש עיקרי על פרק המילולי לשיפור הסכם).\nבשלב זה אין פעולה דחופה נדרשת במהלך השהייה בדרום אמריקה.\nכאשר תבחר בכך, נוכל לבנות לוח זמנים שבועי מדורג ורשימת מועדי הרשמה רשמיים מול מאל״ו.`,
+            activityLogLine: "הציג סקירה רשמית קצרה להיערכות פסיכומטרית."
+          };
+        }
+        return {
+          replyText: `שלום רב. ההרשמה למסלול השש-שנתי ללימודי רפואה בישראל נפתחת לרוב בחודשי החורף (ינואר–פברואר) ונמשכת אל תוך האביב, כאשר מבחני המיון (מו״ר/מרק״ם) מתקיימים בקיץ.\nיש לוודא תאריכים סופיים ומדויקים ישירות באתרי הפקולטות עם פתיחת ההרשמה הרשמית.\nהתיק האקדמי נותר בהמתנה שקטה עד לפנייתך הבאה.`,
+          activityLogLine: "הציג סקירה רשמית של לוחות זמנים לקבלה לרפואה."
+        };
+      }
+
+      // ===============================================================
+      // D. AGENT EXECUTION PIPELINE (LIVE GEMINI + SEAMLESS FALLBACK)
+      // ===============================================================
+      async function executeAgentMessage(agentId, userText, { appendUser = true } = {}) {
+        const ag = AGENTS[agentId];
+        if (!ag) return null;
+
+        if (appendUser) {
+          state.chats[agentId].push({
+            id: "u-" + Date.now() + Math.random().toString(36).slice(2, 6),
+            sender: "user",
+            text: userText,
+            time: getNowTime()
+          });
+        }
+
+        setSpeakingAgent(agentId);
+        renderAllUI();
+        setDrawerTyping(true, `${ag.name} עובד על התשובה...`);
+
+        let result = null;
+        let usedGemini = false;
+
+        try {
+          if (getEffectiveApiKey() || typeof __firebase_config !== "undefined") {
+            result = await callAgentViaGemini(agentId, userText);
+            usedGemini = true;
+          }
+        } catch (err) {
+          usedGemini = false;
+        }
+
+        if (!result) {
+          // Small natural delay so UI feels responsive and alive
+          await new Promise((r) => setTimeout(r, 420));
+          result = runLocalFallback(agentId, userText);
+        }
+
+        updateAiStatusBadge(usedGemini);
+
+        // Handle Roee routing response
+        if (agentId === "roee") {
+          const validTasks = (result.routedTasks || []).filter((rt) => ["dan", "tomer", "eitan"].includes(rt.agentId));
+          const roeeMsg = {
+            id: "a-" + Date.now(),
+            sender: "agent",
+            text: result.replyText,
+            time: getNowTime(),
+            routedTasks: validTasks.map((rt, i) => ({
+              id: `rt-${Date.now()}-${i}`,
+              agentId: rt.agentId,
+              verbatimTask: rt.verbatimTask,
+              dispatched: false,
+              summary: ""
+            }))
+          };
+          state.chats.roee.push(roeeMsg);
+          appendLog("רועי", result.activityLogLine || "ניתב הודעה לצוות.");
+          saveState();
+          renderAllUI();
+
+          if (state.roeeAutoDispatch && roeeMsg.routedTasks.length > 0) {
+            for (const task of roeeMsg.routedTasks) {
+              setDrawerTyping(true, `רועי מעביר ומפעיל את ${AGENTS[task.agentId].name}...`);
+              const subReply = await executeAgentMessage(task.agentId, task.verbatimTask, { appendUser: true });
+              task.dispatched = true;
+              task.summary = subReply?.text || "בוצע.";
+              saveState();
+              renderAllUI();
+            }
+          }
+
+          setSpeakingAgent(null);
+          setDrawerTyping(false);
+          return roeeMsg;
+        }
+
+        // Handle Dan nutrition logging
+        if (agentId === "dan") {
+          let loggedMealId = null;
+          if (result.isMeal && (result.calories > 0 || result.protein > 0)) {
+            const meal = {
+              id: "meal-" + Date.now() + Math.random().toString(36).slice(2, 5),
+              name: result.mealName || userText.slice(0, 34),
+              calories: Math.max(0, Math.round(Number(result.calories) || 0)),
+              protein: Math.max(0, Math.round(Number(result.protein) || 0)),
+              time: getNowTime()
+            };
+            state.nutrition.meals.push(meal);
+            loggedMealId = meal.id;
+          }
+          const danMsg = {
+            id: "a-" + Date.now(),
+            sender: "agent",
+            text: result.replyText,
+            time: getNowTime(),
+            loggedMealId
+          };
+          state.chats.dan.push(danMsg);
+          appendLog("דן", result.activityLogLine || "עדכן מעקב תזונה/כושר.");
+          saveState();
+          setSpeakingAgent(null);
+          setDrawerTyping(false);
+          renderAllUI();
+          return danMsg;
+        }
+
+        // Handle Tomer / Eitan
+        const replyMsg = {
+          id: "a-" + Date.now(),
+          sender: "agent",
+          text: result.replyText,
+          time: getNowTime()
+        };
+        state.chats[agentId].push(replyMsg);
+        appendLog(ag.name, result.activityLogLine || "ענה לפנייה.");
+        saveState();
+        setSpeakingAgent(null);
+        setDrawerTyping(false);
+        renderAllUI();
+        return replyMsg;
+      }
+
+      async function callAgentViaGemini(agentId, userText) {
+        const ctx = buildSharedPromptContext();
+        const recent = (state.chats[agentId] || [])
+          .slice(-5)
+          .map((m) => `${m.sender === "user" ? "משתמש" : AGENTS[agentId].name}: ${m.text}`)
+          .join("\n");
+
+        if (agentId === "roee") {
+          const schema = {
+            type: "OBJECT",
+            properties: {
+              replyText: { type: "STRING" },
+              routedTasks: {
+                type: "ARRAY",
+                items: {
+                  type: "OBJECT",
+                  properties: {
+                    agentId: { type: "STRING" },
+                    verbatimTask: { type: "STRING" }
+                  },
+                  required: ["agentId", "verbatimTask"]
+                }
+              },
+              activityLogLine: { type: "STRING" }
+            },
+            required: ["replyText", "routedTasks", "activityLogLine"]
+          };
+          const sys = `אתה רועי — מנהל המשרד והנתב. טון: עברית קצרה ותכליתית (עד 5 שורות). פצל והעבר כלשונה ל-dan (כושר/תזונה), tomer (טיול/מעברים), או eitan (רפואה/פסיכומטרי) בלי לבצע את המשימה בעצמך.\n${ctx}\nהיסטוריה:\n${recent}`;
+          const raw = await callGeminiIfAvailable({ systemInstruction: sys, userPrompt: userText, responseSchema: schema });
+          return JSON.parse(raw);
+        }
+
+        if (agentId === "dan") {
+          const schema = {
+            type: "OBJECT",
+            properties: {
+              isMeal: { type: "BOOLEAN" },
+              mealName: { type: "STRING" },
+              calories: { type: "INTEGER" },
+              protein: { type: "INTEGER" },
+              replyText: { type: "STRING" },
+              activityLogLine: { type: "STRING" }
+            },
+            required: ["isMeal", "mealName", "calories", "protein", "replyText", "activityLogLine"]
+          };
+          const sys = `אתה דן — מאמן כושר ותזונה. טון: עברית קצרה ותכליתית (עד 5 שורות). הערכות שמרניות למאכלים בדרום אמריקה (כולל שמן בישול). לעולם אל תשנה תוכנית אימונים או יעדי תזונה ללא אישור מפורש.\n${ctx}\nהיסטוריה:\n${recent}`;
+          const raw = await callGeminiIfAvailable({ systemInstruction: sys, userPrompt: userText, responseSchema: schema });
+          return JSON.parse(raw);
+        }
+
+        const schema = {
+          type: "OBJECT",
+          properties: {
+            replyText: { type: "STRING" },
+            activityLogLine: { type: "STRING" }
+          },
+          required: ["replyText", "activityLogLine"]
+        };
+        const sys =
+          agentId === "tomer"
+            ? `אתה תומר — סייר ומדריך טיול. טון: עברית קצרה ותכליתית (עד 5 שורות). תמיד 2 חלופות ברורות (זמן + עלות ל-TravelSpend) + מה חייבים לבדוק בשטח. לעולם אל תסגור הזמנות ואל תקבע עובדות לא מאומתות.\n${ctx}\nהיסטוריה:\n${recent}`
+            : `אתה איתן — יועץ אקדמי ורפואה. טון: עברית רשמית ומקצועית (עד 5 שורות). מרכז מידע על קבלה לרפואה בישראל (מסלול שש-שנתי ופסיכומטרי) בנחת וללא הפעלת לחץ בטיול.\n${ctx}\nהיסטוריה:\n${recent}`;
+        const raw = await callGeminiIfAvailable({ systemInstruction: sys, userPrompt: userText, responseSchema: schema });
+        return JSON.parse(raw);
+      }
+
+      // ---- Conference Room Sequential Runner ----
+      async function runConferenceSession({ title, prompt, overrideParticipants = null, logLabel = "ישיבת צוות" }) {
+        if (isConferenceBusy) return;
+        const participants = overrideParticipants || state.conference.participants;
+        if (!participants.length) return;
+
+        isConferenceBusy = true;
+        setConfBusyUI(true);
+
+        state.conference.messages.push({
+          id: "cu-" + Date.now(),
+          senderType: "user",
+          senderId: "user",
+          senderName: title || "אתה",
+          text: prompt,
+          time: getNowTime()
+        });
+        renderConferenceUI();
+
+        const transcript = [`נושא הישיבה: ${prompt}`];
+
+        try {
+          for (const agId of participants) {
+            const ag = AGENTS[agId];
+            setSpeakingAgent(agId);
+            setConfSpeakingBanner(true, `${ag.name} מדבר כעת בחדר הישיבות...`);
+
+            let replyText = "";
+            try {
+              if (getEffectiveApiKey() || typeof __firebase_config !== "undefined") {
+                const persona =
+                  agId === "eitan"
+                    ? "אתה איתן, יועץ אקדמי ורפואה בעברית רשמית ומקצועית (עד 4 שורות). ענה רק בשמך בישיבה ללא לחץ."
+                    : `אתה ${ag.name} (${ag.role}) בעברית קצרה ותכליתית (עד 4 שורות). ענה רק בשמך בישיבה בהתאם לכללי הברזל.`;
+                replyText = await callGeminiIfAvailable({
+                  systemInstruction: `${persona}\n${buildSharedPromptContext()}`,
+                  userPrompt: `${transcript.join("\n")}\n\nתורך לדבר בישיבה (${ag.name}):`
+                });
+                updateAiStatusBadge(true);
+              }
+            } catch (e) {
+              replyText = "";
+            }
+
+            if (!replyText) {
+              await new Promise((r) => setTimeout(r, 520));
+              replyText = buildLocalConferenceTurn(agId, prompt);
+              updateAiStatusBadge(false);
+            }
+
+            const clean = replyText.trim();
+            transcript.push(`${ag.name}: ${clean}`);
+            state.conference.messages.push({
+              id: "ca-" + Date.now() + "-" + agId,
+              senderType: "agent",
+              senderId: agId,
+              senderName: ag.fullName,
+              text: clean,
+              time: getNowTime()
+            });
+            saveState();
+            renderConferenceUI();
+          }
+          appendLog("חדר ישיבות", `${logLabel} (${participants.map((id) => AGENTS[id].name).join(", ")})`);
+          saveState();
+        } finally {
+          setSpeakingAgent(null);
+          isConferenceBusy = false;
+          setConfSpeakingBanner(false);
+          setConfBusyUI(false);
+          renderAllUI();
+        }
+      }
+
+      function buildLocalConferenceTurn(agId, prompt) {
+        const t = getTotals();
+        const isWeekly = prompt.includes("שבועי") || prompt.includes("weekly");
+        if (agId === "roee") {
+          return isWeekly
+            ? "סיכום ניהול: כל השולחנות מסונכרנים על סוקרה, תזונה ומעברים. מעביר לדן ותומר לסגור מספרים ולוגיסטיקה."
+            : "קיבלתי את הנושא וריכזתי את הצוות סביב השולחן. כל סוכן נותן עכשיו זווית קצרה בתחומו.";
+        }
+        if (agId === "dan") {
+          return `תזונה וכושר: היום עומדים על ${t.cal}/${t.targetCal} קק״ל ו-${t.prot}/${t.targetProt} ג׳ חלבון (${state.nutrition.isTrekDay ? "מצב טרק פעיל" : "יום רגיל"}).\nנותרו ${Math.max(0, t.remCal)} קק״ל ו-${Math.max(0, t.remProt)} ג׳ חלבון. לא משנים תוכנית אימונים — רק מקפידים על מנת חלבון טובה לפני נסיעות/טרקים.`;
+        }
+        if (agId === "tomer") {
+          return isWeekly
+            ? "טיול: הושלם המעבר מקוצ׳במבה לסוקרה (2,800 מ׳). לשבוע הקרוב: לבחור בין עצירה בפוטוסי לבין מעבר ישיר לאויוני (7–8 שעות, ~70–100 BOB). לוודא שעות בטרמינל וחסימות כבישים."
+            : "לוגיסטיקה בסוקרה: יומיים-שלושה כאן מושלמים להתאוששות לפני פוטוסי וסלאר דה אויוני. לפני יציאה לדרך — לוודא בטרמינל שעות יציאה ומצב הכבישים.";
+        }
+        return "שלום רב. מהזווית האקדמית, התיק ללימודי רפואה שמור ומסודר בהמתנה שקטה. אין משימות דחופות להיום; נמשיך לעקוב רק כאשר תבקש לבחון מועדי הרשמה או היערכות לפסיכומטרי.";
+      }
+
+      // ===============================================================
+      // E. THREE.JS 3D VIRTUAL OFFICE SCENE (ISOMETRIC / HALLWAY / CONF)
+      // ===============================================================
+      let scene, camera, renderer, raycaster;
+      let clock = null;
+      let clickableMeshes = [];
+      let characterGroups = {}; // { roee, dan, tomer, eitan }
+      let characterHalos = {};
+      let characterDeskPositions = {};
+      let characterConfPositions = {};
+      let hallwayCeilingGroup = null;
+      let activeCamPreset = "isometric";
+
+      // Smooth Camera Orbit / Look Controller
+      const camState = {
+        currentPos: new THREE.Vector3(0, 18.5, 19.5),
+        targetPos: new THREE.Vector3(0, 18.5, 19.5),
+        currentLook: new THREE.Vector3(0, 0.6, 0),
+        targetLook: new THREE.Vector3(0, 0.6, 0),
+        // Orbit offsets for user dragging
+        orbitTheta: 0,
+        orbitPhi: 0.72,
+        orbitRadius: 24.5,
+        hallwayYaw: 0,
+        hallwayPitch: -0.04,
+        isManualOrbit: false
+      };
+
+      const CAM_PRESETS = {
+        isometric: {
+          pos: new THREE.Vector3(0.5, 17.5, 18.8),
+          look: new THREE.Vector3(0, 0.4, 0.2),
+          theta: 0.03,
+          phi: 0.78,
+          radius: 25.5
+        },
+        hallway: {
+          pos: new THREE.Vector3(-9.6, 2.05, 0),
+          look: new THREE.Vector3(10.5, 1.75, 0),
+          yaw: 0,
+          pitch: -0.03
+        },
+        conference: {
+          pos: new THREE.Vector3(-7.0, 3.05, -0.4),
+          look: new THREE.Vector3(-7.0, 1.4, -6.9),
+          theta: 0,
+          phi: 1.25,
+          radius: 6.4
+        }
+      };
+
+      // Procedural Hebrew Sign Texture Generator (RTL crisp canvas texture)
+      function makeHebrewSignTexture(text, bgHex, textHex = "#FFFFFF") {
+        const canvas = document.createElement("canvas");
+        canvas.width = 512;
+        canvas.height = 140;
+        const ctx = canvas.getContext("2d");
+
+        ctx.fillStyle = bgHex;
+        roundRect(ctx, 8, 8, 496, 124, 24);
+        ctx.fill();
+
+        ctx.strokeStyle = "rgba(255,255,255,0.28)";
+        ctx.lineWidth = 4;
+        ctx.stroke();
+
+        ctx.fillStyle = textHex;
+        ctx.font = "800 54px Heebo, Assistant, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.direction = "rtl";
+        ctx.fillText(text, 256, 74);
+
+        const tex = new THREE.CanvasTexture(canvas);
+        tex.needsUpdate = true;
+        return tex;
+      }
+
+      // Procedural White Tiled Floor Texture
+      function makeTileFloorTexture() {
+        const canvas = document.createElement("canvas");
+        canvas.width = 256;
+        canvas.height = 256;
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#F5F5F4";
+        ctx.fillRect(0, 0, 256, 256);
+        ctx.strokeStyle = "#E2E0DA";
+        ctx.lineWidth = 3;
+        for (let i = 0; i <= 256; i += 64) {
+          ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 256); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(256, i); ctx.stroke();
+        }
+        const tex = new THREE.CanvasTexture(canvas);
+        tex.wrapS = THREE.RepeatWrapping;
+        tex.wrapT = THREE.RepeatWrapping;
+        tex.repeat.set(9, 6);
+        return tex;
+      }
+
+      // Procedural Dark Bar-Chart Screen Texture for Conference Room Wall (matching screenshot 1)
+      function makeConferenceChartTexture() {
+        const canvas = document.createElement("canvas");
+        canvas.width = 512;
+        canvas.height = 256;
+        const ctx = canvas.getContext("2d");
+
+        // Dark slate monitor background
+        ctx.fillStyle = "#0F172A";
+        ctx.fillRect(0, 0, 512, 256);
+        ctx.strokeStyle = "#334155";
+        ctx.lineWidth = 10;
+        ctx.strokeRect(5, 5, 502, 246);
+
+        // Subtle grid lines
+        ctx.strokeStyle = "rgba(148,163,184,0.16)";
+        ctx.lineWidth = 2;
+        for (let y = 52; y < 220; y += 40) {
+          ctx.beginPath(); ctx.moveTo(30, y); ctx.lineTo(310, y); ctx.stroke();
+        }
+
+        // Colorful bars (matching screenshot 1)
+        const bars = [
+          { h: 90, c: "#10B981" },
+          { h: 135, c: "#34D399" },
+          { h: 65, c: "#F59E0B" },
+          { h: 160, c: "#EF4444" },
+          { h: 110, c: "#38BDF8" },
+          { h: 145, c: "#F97316" },
+          { h: 75, c: "#818CF8" }
+        ];
+        bars.forEach((b, i) => {
+          ctx.fillStyle = b.c;
+          roundRect(ctx, 42 + i * 38, 218 - b.h, 24, b.h, 5);
+          ctx.fill();
+        });
+
+        // Right-side summary KPI lines
+        ctx.fillStyle = "#38BDF8";
+        ctx.font = "800 26px Heebo, sans-serif";
+        ctx.textAlign = "right";
+        ctx.direction = "rtl";
+        ctx.fillText("מדדי המשרד", 480, 62);
+
+        ctx.fillStyle = "#E2E8F0";
+        ctx.font = "600 20px Heebo, sans-serif";
+        ctx.fillText("📍 סוקרה, בוליביה", 480, 108);
+        ctx.fillStyle = "#34D399";
+        ctx.fillText("🔥 2,400 / 2,900", 480, 148);
+        ctx.fillStyle = "#FBBF24";
+        ctx.fillText("💪 180g חלבון", 480, 188);
+
+        const tex = new THREE.CanvasTexture(canvas);
+        tex.needsUpdate = true;
+        return tex;
+      }
+
+      function roundRect(ctx, x, y, w, h, r) {
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.arcTo(x + w, y, x + w, y + h, r);
+        ctx.arcTo(x + w, y + h, x, y + h, r);
+        ctx.arcTo(x, y + h, x, y, r);
+        ctx.arcTo(x, y, x + w, y, r);
+        ctx.closePath();
+      }
+
+      // Stylized Low-Poly Potted Plant Builder
+      function createPottedPlant(x, z, scale = 1) {
+        const g = new THREE.Group();
+        const pot = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.32, 0.24, 0.52, 12),
+          new THREE.MeshLambertMaterial({ color: 0xE5E7EB })
+        );
+        pot.position.y = 0.26;
+        pot.castShadow = true;
+        g.add(pot);
+
+        const leafMat = new THREE.MeshLambertMaterial({ color: 0x52B788 });
+        const leaf1 = new THREE.Mesh(new THREE.SphereGeometry(0.42, 12, 10), leafMat);
+        leaf1.position.set(0, 0.85, 0);
+        leaf1.castShadow = true;
+        g.add(leaf1);
+
+        const leaf2 = new THREE.Mesh(new THREE.SphereGeometry(0.32, 12, 10), new THREE.MeshLambertMaterial({ color: 0x74C69D }));
+        leaf2.position.set(0.18, 1.18, 0.08);
+        g.add(leaf2);
+
+        const leaf3 = new THREE.Mesh(new THREE.SphereGeometry(0.28, 12, 10), leafMat);
+        leaf3.position.set(-0.16, 1.12, -0.06);
+        g.add(leaf3);
+
+        g.position.set(x, 0, z);
+        g.scale.setScalar(scale);
+        return g;
+      }
+
+      // Stylized Water Cooler (hallway end prop from screenshot 2)
+      function createWaterCooler(x, z) {
+        const g = new THREE.Group();
+        const body = new THREE.Mesh(
+          new THREE.BoxGeometry(0.55, 1.1, 0.55),
+          new THREE.MeshLambertMaterial({ color: 0xF8FAFC })
+        );
+        body.position.y = 0.55;
+        body.castShadow = true;
+        g.add(body);
+
+        const jug = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.21, 0.21, 0.52, 14),
+          new THREE.MeshPhongMaterial({ color: 0x60A5FA, transparent: true, opacity: 0.78, shininess: 80 })
+        );
+        jug.position.y = 1.36;
+        g.add(jug);
+
+        g.position.set(x, 0, z);
+        return g;
+      }
+
+      // Stylized Open Silver Laptop
+      function createLaptop(x, y, z, rotY = 0) {
+        const g = new THREE.Group();
+        const silverMat = new THREE.MeshLambertMaterial({ color: 0xCBD5E1 });
+        const screenMat = new THREE.MeshBasicMaterial({ color: 0x93C5FD });
+
+        const base = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.04, 0.4), silverMat);
+        g.add(base);
+
+        const lid = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.36, 0.03), silverMat);
+        lid.position.set(0, 0.18, -0.2);
+        lid.rotation.x = -0.22;
+        g.add(lid);
+
+        const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.3), screenMat);
+        screen.position.set(0, 0.18, -0.183);
+        screen.rotation.x = -0.22;
+        g.add(screen);
+
+        g.position.set(x, y, z);
+        g.rotation.y = rotY;
+        return g;
+      }
+
+      // Stylized Wooden Office Desk + Glowing Monitor + Chair
+      function createOfficeDeskSetup(x, z, rotY, accentHex) {
+        const g = new THREE.Group();
+        const woodMat = new THREE.MeshLambertMaterial({ color: 0xD4B28C });
+        const legMat = new THREE.MeshLambertMaterial({ color: 0x475569 });
+
+        const top = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.12, 1.1), woodMat);
+        top.position.y = 0.96;
+        top.castShadow = true;
+        top.receiveShadow = true;
+        g.add(top);
+
+        [[-1.0, -0.45], [1.0, -0.45], [-1.0, 0.45], [1.0, 0.45]].forEach(([lx, lz]) => {
+          const leg = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.95, 0.08), legMat);
+          leg.position.set(lx, 0.475, lz);
+          g.add(leg);
+        });
+
+        // Monitor
+        const stand = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.25, 0.12), legMat);
+        stand.position.set(0, 1.12, -0.24);
+        g.add(stand);
+
+        const frame = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.56, 0.06), new THREE.MeshLambertMaterial({ color: 0x1E293B }));
+        frame.position.set(0, 1.44, -0.26);
+        frame.castShadow = true;
+        g.add(frame);
+
+        const glow = new THREE.Mesh(new THREE.PlaneGeometry(0.84, 0.48), new THREE.MeshBasicMaterial({ color: accentHex }));
+        glow.position.set(0, 1.44, -0.225);
+        g.add(glow);
+
+        // Keyboard
+        const kb = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.03, 0.2), new THREE.MeshLambertMaterial({ color: 0x334155 }));
+        kb.position.set(0, 1.04, 0.14);
+        g.add(kb);
+
+        // Office chair behind desk
+        const chairSeat = new THREE.Mesh(new THREE.BoxGeometry(0.74, 0.1, 0.72), new THREE.MeshLambertMaterial({ color: 0x334155 }));
+        chairSeat.position.set(0, 0.58, 0.92);
+        g.add(chairSeat);
+
+        const chairBack = new THREE.Mesh(new THREE.BoxGeometry(0.74, 0.78, 0.1), new THREE.MeshLambertMaterial({ color: 0x334155 }));
+        chairBack.position.set(0, 0.98, 1.24);
+        g.add(chairBack);
+
+        g.position.set(x, 0, z);
+        g.rotation.y = rotY;
+        return g;
+      }
+
+      // Stylized Rounded 3D Character Builder (matching screenshot 1 & 3 vibe!)
+      function createStylizedCharacter(agentId, shirtColor, hairColor, accessory) {
+        const group = new THREE.Group();
+        group.userData = { targetType: "agent", targetId: agentId };
+
+        const skinMat = new THREE.MeshLambertMaterial({ color: 0xE6C2A3 });
+        const shirtMat = new THREE.MeshLambertMaterial({ color: shirtColor });
+        const hairMat = new THREE.MeshLambertMaterial({ color: hairColor });
+        const darkMat = new THREE.MeshLambertMaterial({ color: 0x1E293B });
+
+        // Seated Torso (rounded cylinder + sphere shoulders)
+        const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.36, 0.85, 14), shirtMat);
+        torso.position.y = 0.95;
+        torso.castShadow = true;
+        group.add(torso);
+
+        const shoulders = new THREE.Mesh(new THREE.SphereGeometry(0.33, 14, 10), shirtMat);
+        shoulders.scale.set(1.18, 0.62, 0.85);
+        shoulders.position.y = 1.32;
+        group.add(shoulders);
+
+        // Neck
+        const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.12, 0.18, 10), skinMat);
+        neck.position.y = 1.5;
+        group.add(neck);
+
+        // Spherical Head
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.3, 16, 14), skinMat);
+        head.position.y = 1.78;
+        head.castShadow = true;
+        group.add(head);
+
+        // Hair cap
+        const hair = new THREE.Mesh(new THREE.SphereGeometry(0.315, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.56), hairMat);
+        hair.position.y = 1.81;
+        group.add(hair);
+
+        // Eyes (facing -Z forward toward desk/laptop)
+        const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.032, 8, 8), darkMat);
+        eyeL.position.set(-0.1, 1.79, -0.27);
+        group.add(eyeL);
+        const eyeR = new THREE.Mesh(new THREE.SphereGeometry(0.032, 8, 8), darkMat);
+        eyeR.position.set(0.1, 1.79, -0.27);
+        group.add(eyeR);
+
+        // Arms reaching forward toward desk/laptop + round hands
+        [-0.36, 0.36].forEach((sideX) => {
+          const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.08, 0.62, 10), shirtMat);
+          arm.position.set(sideX, 1.12, -0.26);
+          arm.rotation.x = Math.PI / 2.6;
+          group.add(arm);
+
+          const hand = new THREE.Mesh(new THREE.SphereGeometry(0.095, 10, 10), skinMat);
+          hand.position.set(sideX * 0.92, 1.02, -0.56);
+          group.add(hand);
+        });
+
+        // Distinct Accessories per Agent
+        if (accessory === "headset") {
+          // Roee's office headset
+          const band = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.03, 8, 20, Math.PI), darkMat);
+          band.position.y = 1.82;
+          group.add(band);
+          [-0.32, 0.32].forEach((ex) => {
+            const ear = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.06, 10), darkMat);
+            ear.rotation.z = Math.PI / 2;
+            ear.position.set(ex, 1.78, 0);
+            group.add(ear);
+          });
+        } else if (accessory === "headband") {
+          // Dan's sporty headband
+          const hb = new THREE.Mesh(new THREE.TorusGeometry(0.295, 0.035, 8, 20), new THREE.MeshLambertMaterial({ color: 0x34D399 }));
+          hb.rotation.x = Math.PI / 2;
+          hb.position.y = 1.9;
+          group.add(hb);
+        } else if (accessory === "hat") {
+          // Tomer's traveler hat
+          const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 0.04, 16), new THREE.MeshLambertMaterial({ color: 0xB45309 }));
+          brim.position.y = 1.98;
+          group.add(brim);
+          const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.3, 0.22, 14), new THREE.MeshLambertMaterial({ color: 0xD97706 }));
+          crown.position.y = 2.1;
+          group.add(crown);
+        } else if (accessory === "glasses") {
+          // Eitan's academic glasses
+          const rimMat = new THREE.MeshLambertMaterial({ color: 0x1E293B });
+          [-0.1, 0.1].forEach((gx) => {
+            const lens = new THREE.Mesh(new THREE.TorusGeometry(0.072, 0.014, 8, 16), rimMat);
+            lens.position.set(gx, 1.79, -0.285);
+            group.add(lens);
+          });
+        }
+
+        // Glowing speaking halo ring under character
+        const halo = new THREE.Mesh(
+          new THREE.RingGeometry(0.55, 0.78, 24),
+          new THREE.MeshBasicMaterial({ color: 0xFBBF24, side: THREE.DoubleSide, transparent: true, opacity: 0 })
+        );
+        halo.rotation.x = -Math.PI / 2;
+        halo.position.y = 0.08;
+        group.add(halo);
+        characterHalos[agentId] = halo;
+
+        // Tag every child mesh for easy Raycaster hit detection
+        group.traverse((obj) => {
+          if (obj.isMesh) {
+            obj.userData = { targetType: "agent", targetId: agentId };
+            clickableMeshes.push(obj);
+          }
+        });
+
+        return group;
+      }
+
+      // Build Wall Segment Helper
+      function addWall(x, y, z, w, h, d, color = 0xFAF8F3) {
+        const mesh = new THREE.Mesh(
+          new THREE.BoxGeometry(w, h, d),
+          new THREE.MeshLambertMaterial({ color })
+        );
+        mesh.position.set(x, y, z);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        scene.add(mesh);
+        return mesh;
+      }
+
+      // Build Wood-Framed Doorway + Floating Colored Hebrew Sign (exact match to screenshot 2!)
+      function addHallwayDoorway({ x, z, signText, signColorHex, targetType, targetId, faceSouth }) {
+        const frameMat = new THREE.MeshLambertMaterial({ color: 0xC6A27E });
+        const doorW = 1.65;
+        const doorH = 2.45;
+
+        // Left & Right Jambs + Lintel
+        const leftJamb = new THREE.Mesh(new THREE.BoxGeometry(0.14, doorH, 0.28), frameMat);
+        leftJamb.position.set(x - doorW / 2, doorH / 2, z);
+        scene.add(leftJamb);
+
+        const rightJamb = new THREE.Mesh(new THREE.BoxGeometry(0.14, doorH, 0.28), frameMat);
+        rightJamb.position.set(x + doorW / 2, doorH / 2, z);
+        scene.add(rightJamb);
+
+        const lintel = new THREE.Mesh(new THREE.BoxGeometry(doorW + 0.14, 0.14, 0.28), frameMat);
+        lintel.position.set(x, doorH, z);
+        scene.add(lintel);
+
+        // Floating Colored Hebrew Sign above the doorway (visible both down the hallway and isometric)
+        const signTex = makeHebrewSignTexture(signText, signColorHex);
+        const signMat = new THREE.MeshBasicMaterial({ map: signTex });
+        const sideMat = new THREE.MeshLambertMaterial({ color: signColorHex });
+        const signMesh = new THREE.Mesh(
+          new THREE.BoxGeometry(1.75, 0.48, 0.08),
+          [sideMat, sideMat, sideMat, sideMat, signMat, signMat]
+        );
+        // Protrude slightly into corridor and angle toward the hallway camera (-X -> +X)
+        signMesh.position.set(x, doorH + 0.42, z + (faceSouth ? 0.55 : -0.55));
+        signMesh.rotation.y = Math.PI / 2;
+        signMesh.userData = { targetType, targetId };
+        scene.add(signMesh);
+        clickableMeshes.push(signMesh);
+      }
+
+      function initThreeScene() {
+        const canvas = document.getElementById("office3dCanvas");
+        const wrapper = document.getElementById("view-3d-wrapper");
+        if (!canvas || !wrapper || typeof THREE === "undefined") return;
+
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x1B2636);
+
+        const w = Math.max(wrapper.clientWidth, 300);
+        const h = Math.max(wrapper.clientHeight, 300);
+        camera = new THREE.PerspectiveCamera(44, w / h, 0.2, 120);
+        camera.position.copy(camState.currentPos);
+        camera.lookAt(camState.currentLook);
+
+        renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        renderer.setSize(w, h, false);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+        raycaster = new THREE.Raycaster();
+        clock = new THREE.Clock();
+
+        // Crisp Bright Architectural Lighting
+        const hemiLight = new THREE.HemisphereLight(0xFFFDF8, 0xCBD5E1, 0.88);
+        scene.add(hemiLight);
+
+        const dirLight = new THREE.DirectionalLight(0xFFFBF0, 0.78);
+        dirLight.position.set(12, 22, 14);
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 1024;
+        dirLight.shadow.mapSize.height = 1024;
+        dirLight.shadow.camera.near = 2;
+        dirLight.shadow.camera.far = 55;
+        dirLight.shadow.camera.left = -16;
+        dirLight.shadow.camera.right = 16;
+        dirLight.shadow.camera.top = 14;
+        dirLight.shadow.camera.bottom = -14;
+        scene.add(dirLight);
+
+        // Warm fill light inside hallway
+        const hallFill = new THREE.PointLight(0xFFFDF5, 0.45, 24);
+        hallFill.position.set(0, 3.2, 0);
+        scene.add(hallFill);
+
+        // ---- 1. BASE SLAB & WHITE TILED FLOOR ----
+        const baseSlab = new THREE.Mesh(
+          new THREE.BoxGeometry(22.6, 0.45, 15.6),
+          new THREE.MeshLambertMaterial({ color: 0xE2DDD5 })
+        );
+        baseSlab.position.set(0, -0.24, 0);
+        scene.add(baseSlab);
+
+        const floorTile = new THREE.Mesh(
+          new THREE.PlaneGeometry(22, 15),
+          new THREE.MeshLambertMaterial({ map: makeTileFloorTexture() })
+        );
+        floorTile.rotation.x = -Math.PI / 2;
+        floorTile.receiveShadow = true;
+        scene.add(floorTile);
+
+        // ---- 2. OUTER CUTAWAY WALLS (3.2 high on back/sides, low cutaway in front) ----
+        const wallH = 3.3;
+        const wallT = 0.28;
+        // Back wall (North, Z = -7.5)
+        addWall(0, wallH / 2, -7.5, 22.2, wallH, wallT, 0xFAF7F2);
+        // Left & Right side walls
+        addWall(-11, wallH / 2, 0, wallT, wallH, 15.2, 0xF5F1E9);
+        addWall(11, wallH / 2, 0, wallT, wallH, 15.2, 0xF5F1E9);
+        // Front low cutaway wall (South, Z = +7.5) so dollhouse is open
+        addWall(0, 0.45, 7.5, 22.2, 0.9, wallT, 0xEFEAE0);
+
+        // Blue-sky windows along the North back wall (matching screenshot 3!)
+        [-9.2, -5.0, -1.2, 2.2, 5.8, 9.2].forEach((wx) => {
+          const winFrame = new THREE.Mesh(new THREE.BoxGeometry(1.7, 1.25, 0.14), new THREE.MeshLambertMaterial({ color: 0xFFFFFF }));
+          winFrame.position.set(wx, 2.1, -7.32);
+          scene.add(winFrame);
+          const glass = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1.05), new THREE.MeshBasicMaterial({ color: 0x6366F1 }));
+          glass.position.set(wx, 2.1, -7.24);
+          scene.add(glass);
+        });
+
+        // ---- 3. INTERIOR PARTITION WALLS & CORRIDOR ----
+        // North partition dividers (separating Conference | Dan | Tomer)
+        addWall(-3.0, wallH / 2, -4.55, 0.22, wallH, 5.9, 0xF7F4ED);
+        addWall(4.0, wallH / 2, -4.55, 0.22, wallH, 5.9, 0xF7F4ED);
+        // South partition divider (separating Roee | Eitan)
+        addWall(0.0, wallH / 2, 4.55, 0.22, wallH, 5.9, 0xF7F4ED);
+
+        // North Corridor Wall (Z = -1.6) with 3 doorway openings at X = -7.0, +0.5, +7.5
+        addWall(-9.4, wallH / 2, -1.6, 3.1, wallH, 0.22, 0xF8F6F1);
+        addWall(-3.25, wallH / 2, -1.6, 5.8, wallH, 0.22, 0xF8F6F1);
+        addWall(4.0, wallH / 2, -1.6, 5.3, wallH, 0.22, 0xF8F6F1);
+        addWall(9.65, wallH / 2, -1.6, 2.6, wallH, 0.22, 0xF8F6F1);
+
+        // South Corridor Wall (Z = +1.6) with 2 doorway openings at X = -5.5, +5.5
+        addWall(-8.65, wallH / 2, 1.6, 4.6, wallH, 0.22, 0xF8F6F1);
+        addWall(0.0, wallH / 2, 1.6, 9.3, wallH, 0.22, 0xF8F6F1);
+        addWall(8.65, wallH / 2, 1.6, 4.6, wallH, 0.22, 0xF8F6F1);
+
+        // Wood-framed Doorways & Floating Colored Hebrew Hallway Signs
+        addHallwayDoorway({ x: -7.0, z: -1.6, signText: "חדר ישיבות", signColorHex: "#D97706", targetType: "conference", targetId: "conference", faceSouth: true });
+        addHallwayDoorway({ x: 0.5, z: -1.6, signText: "כושר ותזונה", signColorHex: "#059669", targetType: "agent", targetId: "dan", faceSouth: true });
+        addHallwayDoorway({ x: 7.5, z: -1.6, signText: "טיול ומעברים", signColorHex: "#EA580C", targetType: "agent", targetId: "tomer", faceSouth: true });
+        addHallwayDoorway({ x: -5.5, z: 1.6, signText: "ניהול וניתוב", signColorHex: "#7C3AED", targetType: "agent", targetId: "roee", faceSouth: false });
+        addHallwayDoorway({ x: 5.5, z: 1.6, signText: "אקדמיה ורפואה", signColorHex: "#2563EB", targetType: "agent", targetId: "eitan", faceSouth: false });
+
+        // ---- 4. HALLWAY CEILING & GLOWING LED PANELS (SHOWN ONLY IN HALLWAY VIEW) ----
+        hallwayCeilingGroup = new THREE.Group();
+        const ceilSlab = new THREE.Mesh(
+          new THREE.BoxGeometry(22.2, 0.2, 4.0),
+          new THREE.MeshLambertMaterial({ color: 0xECE8E0 })
+        );
+        ceilSlab.position.set(0, 3.4, 0);
+        hallwayCeilingGroup.add(ceilSlab);
+
+        [-8.0, -4.0, 0, 4.0, 8.0].forEach((lx) => {
+          const panel = new THREE.Mesh(
+            new THREE.PlaneGeometry(1.5, 0.72),
+            new THREE.MeshBasicMaterial({ color: 0xFFFFFF })
+          );
+          panel.rotation.x = Math.PI / 2;
+          panel.position.set(lx, 3.29, 0);
+          hallwayCeilingGroup.add(panel);
+        });
+        hallwayCeilingGroup.visible = false; // Hidden in isometric dollhouse view!
+        scene.add(hallwayCeilingGroup);
+
+        // Hallway far-end props (Water Cooler + Potted Plant — screenshot 2!)
+        scene.add(createWaterCooler(10.35, -0.7));
+        scene.add(createPottedPlant(10.35, 0.72, 1.15));
+
+        // ---- 5. COLORED ROOM RUGS & FURNITURE FOR ALL 5 ROOMS ----
+        function addRoomRug(x, z, w, d, colorHex, targetType, targetId) {
+          const rug = new THREE.Mesh(
+            new THREE.PlaneGeometry(w, d),
+            new THREE.MeshLambertMaterial({ color: colorHex })
+          );
+          rug.rotation.x = -Math.PI / 2;
+          rug.position.set(x, 0.02, z);
+          rug.receiveShadow = true;
+          rug.userData = { targetType, targetId };
+          scene.add(rug);
+          clickableMeshes.push(rug);
+        }
+
+        // ROOM A: Conference Room (North-Left: X = -11 to -3, Z = -7.5 to -1.6)
+        addRoomRug(-7.0, -4.55, 6.8, 4.9, 0x94A3B8, "conference", "conference");
+
+        // Long Wooden Conference Table (running North-South so camera looks right down it!)
+        const confTableTop = new THREE.Mesh(
+          new THREE.BoxGeometry(2.35, 0.14, 4.15),
+          new THREE.MeshLambertMaterial({ color: 0xB89B7A })
+        );
+        confTableTop.position.set(-7.0, 0.96, -4.25);
+        confTableTop.castShadow = true;
+        confTableTop.receiveShadow = true;
+        confTableTop.userData = { targetType: "conference", targetId: "conference" };
+        scene.add(confTableTop);
+        clickableMeshes.push(confTableTop);
+
+        const confLeg1 = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.92, 0.45), new THREE.MeshLambertMaterial({ color: 0x334155 }));
+        confLeg1.position.set(-7.0, 0.46, -2.9);
+        scene.add(confLeg1);
+        const confLeg2 = confLeg1.clone();
+        confLeg2.position.set(-7.0, 0.46, -5.6);
+        scene.add(confLeg2);
+
+        // Silver Laptops on the Conference Table (2 left, 2 right)
+        scene.add(createLaptop(-7.75, 1.06, -3.35, -Math.PI / 2));
+        scene.add(createLaptop(-7.75, 1.06, -5.0, -Math.PI / 2));
+        scene.add(createLaptop(-6.25, 1.06, -3.35, Math.PI / 2));
+        scene.add(createLaptop(-6.25, 1.06, -5.0, Math.PI / 2));
+
+        // Conference Chairs around table
+        [
+          [-8.55, -3.35, Math.PI / 2],
+          [-8.55, -5.0, Math.PI / 2],
+          [-5.45, -3.35, -Math.PI / 2],
+          [-5.45, -5.0, -Math.PI / 2]
+        ].forEach(([cx, cz, rot]) => {
+          const seat = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.1, 0.68), new THREE.MeshLambertMaterial({ color: 0x475569 }));
+          seat.position.set(cx, 0.56, cz);
+          scene.add(seat);
+          const back = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.72, 0.1), new THREE.MeshLambertMaterial({ color: 0x334155 }));
+          back.position.set(cx + (rot > 0 ? -0.3 : 0.3), 0.94, cz);
+          back.rotation.y = rot;
+          scene.add(back);
+        });
+
+        // Dark Wall Presentation Bar-Chart Screen on Conference Back Wall (Z = -7.3)
+        const chartScreen = new THREE.Mesh(
+          new THREE.BoxGeometry(2.6, 1.35, 0.08),
+          new THREE.MeshBasicMaterial({ map: makeConferenceChartTexture() })
+        );
+        chartScreen.position.set(-7.0, 2.05, -7.28);
+        chartScreen.userData = { targetType: "conference", targetId: "conference" };
+        scene.add(chartScreen);
+        clickableMeshes.push(chartScreen);
+        scene.add(createPottedPlant(-10.1, -6.6, 0.95));
+
+        // ROOM B: Dan — Fitness & Nutrition (North-Center: X = -3 to +4)
+        addRoomRug(0.5, -4.55, 5.8, 4.7, 0xA7F3D0, "agent", "dan");
+        scene.add(createOfficeDeskSetup(0.5, -5.2, 0, 0x10B981));
+        scene.add(createPottedPlant(-2.1, -6.6, 0.9));
+        // Mini Dumbbell Rack Prop in Dan's room
+        const rack = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.55, 0.38), new THREE.MeshLambertMaterial({ color: 0x334155 }));
+        rack.position.set(2.9, 0.28, -6.5);
+        scene.add(rack);
+        [2.55, 2.9, 3.25].forEach((dx) => {
+          const db = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.42, 10), new THREE.MeshLambertMaterial({ color: 0x059669 }));
+          db.rotation.x = Math.PI / 2;
+          db.position.set(dx, 0.65, -6.5);
+          scene.add(db);
+        });
+
+        // ROOM C: Tomer — Travel & Logistics (North-Right: X = +4 to +11)
+        addRoomRug(7.5, -4.55, 5.8, 4.7, 0xFED7AA, "agent", "tomer");
+        scene.add(createOfficeDeskSetup(7.5, -5.2, 0, 0xF97316));
+        scene.add(createPottedPlant(10.1, -6.6, 0.95));
+        // Travel Backpack Prop in Tomer's room
+        const pack = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.78, 0.36), new THREE.MeshLambertMaterial({ color: 0x0284C7 }));
+        pack.position.set(5.1, 0.4, -6.6);
+        scene.add(pack);
+
+        // ROOM D: Roee — Office Manager & Router (South-Left: X = -11 to 0)
+        addRoomRug(-5.5, 4.55, 8.8, 4.7, 0xDDD6FE, "agent", "roee");
+        scene.add(createOfficeDeskSetup(-5.5, 5.1, Math.PI, 0x8B5CF6));
+        scene.add(createPottedPlant(-10.0, 6.4, 1.0));
+
+        // ROOM E: Eitan — Medical Library (South-Right: X = 0 to +11)
+        addRoomRug(5.5, 4.55, 8.8, 4.7, 0xBFDBFE, "agent", "eitan");
+        scene.add(createOfficeDeskSetup(5.5, 5.1, Math.PI, 0x3B82F6));
+        scene.add(createPottedPlant(10.0, 6.4, 0.95));
+        // Bookshelf Prop in Eitan's library
+        const shelf = new THREE.Mesh(new THREE.BoxGeometry(0.45, 2.2, 2.4), new THREE.MeshLambertMaterial({ color: 0xA47148 }));
+        shelf.position.set(10.45, 1.1, 4.1);
+        scene.add(shelf);
+
+        // ---- 6. CREATE THE 4 STYLIZED 3D CHARACTERS ----
+        characterDeskPositions = {
+          roee: { pos: new THREE.Vector3(-5.5, 0, 4.18), rotY: Math.PI },
+          dan: { pos: new THREE.Vector3(0.5, 0, -4.28), rotY: 0 },
+          tomer: { pos: new THREE.Vector3(7.5, 0, -4.28), rotY: 0 },
+          eitan: { pos: new THREE.Vector3(5.5, 0, 4.18), rotY: Math.PI }
+        };
+
+        characterConfPositions = {
+          roee: { pos: new THREE.Vector3(-8.4, 0, -3.35), rotY: -Math.PI / 2 },
+          dan: { pos: new THREE.Vector3(-8.4, 0, -5.0), rotY: -Math.PI / 2 },
+          tomer: { pos: new THREE.Vector3(-5.6, 0, -3.35), rotY: Math.PI / 2 },
+          eitan: { pos: new THREE.Vector3(-5.6, 0, -5.0), rotY: Math.PI / 2 }
+        };
+
+        characterGroups.roee = createStylizedCharacter("roee", 0x7C3AED, 0x2B211B, "headset");
+        characterGroups.dan = createStylizedCharacter("dan", 0x059669, 0x3B2A1E, "headband");
+        characterGroups.tomer = createStylizedCharacter("tomer", 0xEA580C, 0x5C3A21, "hat");
+        characterGroups.eitan = createStylizedCharacter("eitan", 0x2563EB, 0x334155, "glasses");
+
+        Object.keys(characterGroups).forEach((id) => {
+          const d = characterDeskPositions[id];
+          characterGroups[id].position.copy(d.pos);
+          characterGroups[id].rotation.y = d.rotY;
+          scene.add(characterGroups[id]);
+        });
+
+        // Build projected HTML 3D nameplates
+        build3dFloatingLabels();
+
+        // Wire touch + mouse orbit/tap controls on canvas
+        setup3dInputControls(canvas);
+
+        // Redraw Hebrew doorway textures once webfont finishes loading
+        if (document.fonts && document.fonts.ready) {
+          document.fonts.ready.then(() => {
+            // Re-apply sign textures if fonts loaded late
+            scene.traverse((obj) => {
+              if (obj.isMesh && Array.isArray(obj.material) && obj.material[4]?.map) {
+                obj.material[4].map.needsUpdate = true;
+              }
+            });
+          });
+        }
+      }
+
+      // Create the 5 Floating Projected HTML Pills over 3D Characters / Conference Room
+      const labelElements = {};
+      function build3dFloatingLabels() {
+        const layer = document.getElementById("labels3dLayer");
+        layer.innerHTML = "";
+        const items = [
+          { id: "roee", text: "רועי — מנהל המשרד", color: "#A855F7", type: "agent" },
+          { id: "dan", text: "דן — כושר ותזונה", color: "#10B981", type: "agent" },
+          { id: "tomer", text: "תומר — טיול ומעברים", color: "#F97316", type: "agent" },
+          { id: "eitan", text: "איתן — אקדמיה ורפואה", color: "#3B82F6", type: "agent" },
+          { id: "conference", text: "חדר ישיבות", color: "#F59E0B", type: "conference" }
+        ];
+
+        items.forEach((item) => {
+          const el = document.createElement("button");
+          el.type = "button";
+          el.className = "floating-3d-label";
+          el.innerHTML = `<span class="status-dot" style="background:${item.color}"></span><span>${item.text}</span>`;
+          el.addEventListener("click", (e) => {
+            e.stopPropagation();
+            handle3dTargetSelected(item.type, item.id);
+          });
+          layer.appendChild(el);
+          labelElements[item.id] = el;
+        });
+      }
+
+      function handle3dTargetSelected(type, id) {
+        if (type === "conference") {
+          setCameraPreset("conference");
+          switchMainTab("conference");
+          return;
+        }
+        if (type === "agent" && AGENTS[id]) {
+          // Focus camera smoothly toward that agent's room before opening chat drawer
+          const target = activeCamPreset === "conference" ? characterConfPositions[id].pos : characterDeskPositions[id].pos;
+          camState.isManualOrbit = false;
+          camState.targetLook.set(target.x, 1.3, target.z);
+          if (activeCamPreset === "isometric") {
+            camState.targetPos.set(target.x, 9.5, target.z + 8.5);
+          }
+          openAgentDrawer(id);
+        }
+      }
+
+      function setCameraPreset(presetName) {
+        activeCamPreset = presetName;
+        camState.isManualOrbit = false;
+        const p = CAM_PRESETS[presetName];
+        if (!p) return;
+
+        camState.targetPos.copy(p.pos);
+        camState.targetLook.copy(p.look);
+        if (p.theta !== undefined) camState.orbitTheta = p.theta;
+        if (p.phi !== undefined) camState.orbitPhi = p.phi;
+        if (p.radius !== undefined) camState.orbitRadius = p.radius;
+        if (p.yaw !== undefined) camState.hallwayYaw = p.yaw;
+        if (p.pitch !== undefined) camState.hallwayPitch = p.pitch;
+
+        // Show hallway ceiling & LED strips ONLY in first-person hallway preset
+        if (hallwayCeilingGroup) {
+          hallwayCeilingGroup.visible = presetName === "hallway";
+        }
+
+        // Update preset buttons UI
+        document.querySelectorAll("[data-cam-preset]").forEach((btn) => {
+          btn.classList.toggle("active", btn.getAttribute("data-cam-preset") === presetName);
+        });
+
+        // Show compact quick conference action bar when viewing 3D Conference Room
+        const confBar = document.getElementById("hudConferenceQuickBar");
+        if (confBar) {
+          confBar.classList.toggle("hidden", presetName !== "conference");
+        }
+      }
+
+      // Smoothly move characters to Conference Table when in Conference preset (or active meeting), else to desks
+      function updateCharacterSeatPositions(dt) {
+        const useConfSeats = activeCamPreset === "conference" || isConferenceBusy;
+        const t = clock ? clock.getElapsedTime() : 0;
+
+        Object.keys(characterGroups).forEach((id, idx) => {
+          const grp = characterGroups[id];
+          if (!grp) return;
+
+          const seat = useConfSeats ? characterConfPositions[id] : characterDeskPositions[id];
+          grp.position.x += (seat.pos.x - grp.position.x) * Math.min(1, dt * 6);
+          grp.position.z += (seat.pos.z - grp.position.z) * Math.min(1, dt * 6);
+
+          // Shortest angle lerp for rotation
+          let diff = seat.rotY - grp.rotation.y;
+          while (diff > Math.PI) diff -= Math.PI * 2;
+          while (diff < -Math.PI) diff += Math.PI * 2;
+          grp.rotation.y += diff * Math.min(1, dt * 6);
+
+          // Idle breathing vs energetic speaking bob
+          const isSpeaking = speakingAgentId === id;
+          if (isSpeaking) {
+            grp.position.y = Math.abs(Math.sin(t * 7.5)) * 0.22;
+            if (characterHalos[id]) {
+              characterHalos[id].material.opacity = 0.55 + Math.sin(t * 8) * 0.35;
+              const s = 1 + Math.sin(t * 8) * 0.14;
+              characterHalos[id].scale.set(s, s, 1);
+            }
+          } else {
+            grp.position.y = Math.sin(t * 2.1 + idx * 1.4) * 0.035;
+            if (characterHalos[id]) {
+              characterHalos[id].material.opacity = 0;
+            }
+          }
+        });
+      }
+
+      // Project 3D anchor positions to 2D screen coordinates for floating nameplates
+      function update3dFloatingLabels() {
+        if (!camera || !renderer) return;
+        const wrapper = document.getElementById("view-3d-wrapper");
+        if (!wrapper || wrapper.classList.contains("hidden")) return;
+
+        const w = wrapper.clientWidth;
+        const h = wrapper.clientHeight;
+        const tmp = new THREE.Vector3();
+
+        const anchors = {
+          roee: characterGroups.roee ? characterGroups.roee.position.clone().add(new THREE.Vector3(0, 2.55, 0)) : null,
+          dan: characterGroups.dan ? characterGroups.dan.position.clone().add(new THREE.Vector3(0, 2.55, 0)) : null,
+          tomer: characterGroups.tomer ? characterGroups.tomer.position.clone().add(new THREE.Vector3(0, 2.55, 0)) : null,
+          eitan: characterGroups.eitan ? characterGroups.eitan.position.clone().add(new THREE.Vector3(0, 2.55, 0)) : null,
+          conference: new THREE.Vector3(-7.0, 2.95, -4.3)
+        };
+
+        Object.keys(anchors).forEach((id) => {
+          const el = labelElements[id];
+          const pos = anchors[id];
+          if (!el || !pos) return;
+
+          // Hide conference label when already inside conference view to keep table uncluttered
+          if (id === "conference" && activeCamPreset === "conference") {
+            el.style.opacity = "0";
+            el.style.pointerEvents = "none";
+            return;
+          }
+
+          tmp.copy(pos).project(camera);
+          const inFront = tmp.z < 1;
+          const x = (tmp.x * 0.5 + 0.5) * w;
+          const y = (-tmp.y * 0.5 + 0.5) * h;
+
+          if (!inFront || x < -40 || x > w + 40 || y < 52 || y > h - 68) {
+            el.style.opacity = "0";
+            el.style.pointerEvents = "none";
+          } else {
+            el.style.opacity = "1";
+            el.style.pointerEvents = "auto";
+            el.style.left = `${x}px`;
+            el.style.top = `${y}px`;
+            el.classList.toggle("speaking", speakingAgentId === id);
+          }
+        });
+      }
+
+      // Touch + Mouse Controls (Drag Orbit / Hallway Look + Pinch Zoom + Raycast Tap)
+      function setup3dInputControls(canvas) {
+        let isDragging = false;
+        let startX = 0;
+        let startY = 0;
+        let prevX = 0;
+        let prevY = 0;
+        let movedDist = 0;
+        let pinchStartDist = 0;
+
+        function onPointerStart(clientX, clientY) {
+          isDragging = true;
+          startX = prevX = clientX;
+          startY = prevY = clientY;
+          movedDist = 0;
+        }
+
+        function onPointerMove(clientX, clientY) {
+          if (!isDragging) return;
+          const dx = clientX - prevX;
+          const dy = clientY - prevY;
+          prevX = clientX;
+          prevY = clientY;
+          movedDist += Math.hypot(dx, dy);
+
+          if (movedDist > 4) {
+            camState.isManualOrbit = true;
+            if (activeCamPreset === "hallway") {
+              // First-person look around inside hallway
+              camState.hallwayYaw -= dx * 0.0045;
+              camState.hallwayPitch = Math.max(-0.4, Math.min(0.35, camState.hallwayPitch - dy * 0.0035));
+              const dirX = Math.cos(camState.hallwayPitch) * Math.cos(camState.hallwayYaw);
+              const dirY = Math.sin(camState.hallwayPitch);
+              const dirZ = Math.cos(camState.hallwayPitch) * Math.sin(camState.hallwayYaw);
+              camState.targetLook.set(
+                camState.targetPos.x + dirX * 12,
+                camState.targetPos.y + dirY * 12,
+                camState.targetPos.z + dirZ * 12
+              );
+            } else {
+              // Smooth Orbit around center/conference target
+              camState.orbitTheta -= dx * 0.0065;
+              camState.orbitPhi = Math.max(0.32, Math.min(1.38, camState.orbitPhi - dy * 0.0065));
+              const center = activeCamPreset === "conference" ? new THREE.Vector3(-7.0, 1.3, -4.3) : new THREE.Vector3(0, 0.4, 0);
+              camState.targetLook.copy(center);
+              camState.targetPos.set(
+                center.x + camState.orbitRadius * Math.sin(camState.orbitPhi) * Math.sin(camState.orbitTheta),
+                center.y + camState.orbitRadius * Math.cos(camState.orbitPhi),
+                center.z + camState.orbitRadius * Math.sin(camState.orbitPhi) * Math.cos(camState.orbitTheta)
+              );
+            }
+          }
+        }
+
+        function onPointerEnd(clientX, clientY) {
+          if (!isDragging) return;
+          isDragging = false;
+          // If it was a crisp tap (minimal movement), run raycast!
+          if (movedDist < 10) {
+            performRaycastTap(clientX, clientY);
+          }
+        }
+
+        function applyZoom(delta) {
+          if (activeCamPreset === "hallway") {
+            // Walk gently forward/back along hallway corridor
+            const nextX = Math.max(-9.8, Math.min(8.2, camState.targetPos.x - delta * 0.025));
+            camState.targetPos.x = nextX;
+            camState.targetLook.x = nextX + Math.cos(camState.hallwayYaw) * 12;
+            return;
+          }
+          camState.isManualOrbit = true;
+          camState.orbitRadius = Math.max(5.5, Math.min(34, camState.orbitRadius + delta * 0.02));
+          const center = activeCamPreset === "conference" ? new THREE.Vector3(-7.0, 1.3, -4.3) : new THREE.Vector3(0, 0.4, 0);
+          camState.targetPos.set(
+            center.x + camState.orbitRadius * Math.sin(camState.orbitPhi) * Math.sin(camState.orbitTheta),
+            center.y + camState.orbitRadius * Math.cos(camState.orbitPhi),
+            center.z + camState.orbitRadius * Math.sin(camState.orbitPhi) * Math.cos(camState.orbitTheta)
+          );
+        }
+
+        function performRaycastTap(clientX, clientY) {
+          if (!raycaster || !camera) return;
+          const rect = canvas.getBoundingClientRect();
+          const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1;
+          const ndcY = -((clientY - rect.top) / rect.height) * 2 + 1;
+          raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
+          const hits = raycaster.intersectObjects(clickableMeshes, false);
+          if (hits.length > 0) {
+            const meta = hits[0].object.userData;
+            if (meta && meta.targetType) {
+              handle3dTargetSelected(meta.targetType, meta.targetId);
+            }
+          }
+        }
+
+        // Mouse Events
+        canvas.addEventListener("mousedown", (e) => onPointerStart(e.clientX, e.clientY));
+        window.addEventListener("mousemove", (e) => onPointerMove(e.clientX, e.clientY));
+        window.addEventListener("mouseup", (e) => onPointerEnd(e.clientX, e.clientY));
+        canvas.addEventListener("wheel", (e) => {
+          e.preventDefault();
+          applyZoom(e.deltaY);
+        }, { passive: false });
+
+        // Touch Events (1-finger orbit/tap, 2-finger pinch zoom)
+        canvas.addEventListener("touchstart", (e) => {
+          if (e.touches.length === 1) {
+            onPointerStart(e.touches[0].clientX, e.touches[0].clientY);
+          } else if (e.touches.length === 2) {
+            isDragging = false;
+            pinchStartDist = Math.hypot(
+              e.touches[0].clientX - e.touches[1].clientX,
+              e.touches[0].clientY - e.touches[1].clientY
+            );
+          }
+        }, { passive: true });
+
+        canvas.addEventListener("touchmove", (e) => {
+          if (e.touches.length === 1 && isDragging) {
+            onPointerMove(e.touches[0].clientX, e.touches[0].clientY);
+          } else if (e.touches.length === 2 && pinchStartDist > 0) {
+            const dist = Math.hypot(
+              e.touches[0].clientX - e.touches[1].clientX,
+              e.touches[0].clientY - e.touches[1].clientY
+            );
+            applyZoom((pinchStartDist - dist) * 1.4);
+            pinchStartDist = dist;
+          }
+        }, { passive: true });
+
+        canvas.addEventListener("touchend", (e) => {
+          if (e.changedTouches.length === 1 && isDragging) {
+            onPointerEnd(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+          }
+          if (e.touches.length < 2) pinchStartDist = 0;
+        });
+      }
+
+      function resizeThreeCanvas() {
+        const wrapper = document.getElementById("view-3d-wrapper");
+        if (!wrapper || !renderer || !camera) return;
+        const w = wrapper.clientWidth;
+        const h = wrapper.clientHeight;
+        if (w <= 0 || h <= 0) return;
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+        renderer.setSize(w, h, false);
+      }
+
+      function animate3D() {
+        requestAnimationFrame(animate3D);
+        if (!renderer || !scene || !camera) return;
+
+        const wrapper = document.getElementById("view-3d-wrapper");
+        if (wrapper.classList.contains("hidden")) return;
+
+        const dt = Math.min(clock.getDelta(), 0.05);
+
+        // Smooth camera interpolation
+        const lerpAlpha = Math.min(1, dt * 6.5);
+        camState.currentPos.lerp(camState.targetPos, lerpAlpha);
+        camState.currentLook.lerp(camState.targetLook, lerpAlpha);
+        camera.position.copy(camState.currentPos);
+        camera.lookAt(camState.currentLook);
+
+        updateCharacterSeatPositions(dt);
+        renderer.render(scene, camera);
+        update3dFloatingLabels();
+      }
+
+      // ===============================================================
+      // F. UI RENDERING & STATE SYNCHRONIZATION
+      // ===============================================================
+      function setSpeakingAgent(agId) {
+        speakingAgentId = agId;
+      }
+
+      function updateAiStatusBadge(isGemini) {
+        const dot = document.getElementById("aiModeDot");
+        const lbl = document.getElementById("aiModeLabel");
+        const badge = document.getElementById("apiKeyStatusBadge");
+        if (isGemini) {
+          dot.className = "w-1.5 h-1.5 rounded-full bg-indigo-500";
+          lbl.textContent = "מחובר ל-Gemini AI";
+          if (badge) badge.textContent = "מחובר ל-Gemini AI ✓";
+        } else {
+          dot.className = "w-1.5 h-1.5 rounded-full bg-emerald-500";
+          lbl.textContent = state.userApiKey ? "מפתח שמור • מנוע גיבוי" : "מנוע חכם מובנה (פעיל)";
+          if (badge) badge.textContent = state.userApiKey ? "מפתח שמור ✓" : "מנוע מקומי חכם פעיל";
+        }
+      }
+
+      function applyTiinyOffsetSetting() {
+        document.body.classList.toggle("tiiny-spacer-off", !state.tiinySpacerEnabled);
+        const toggle = document.getElementById("settingTiinyToggle");
+        if (toggle) toggle.checked = state.tiinySpacerEnabled;
+        setTimeout(resizeThreeCanvas, 50);
+      }
+
+      function applyViewAndTabVisibility() {
+        const isOffice = state.activeTab === "office";
+        const show3D = isOffice && state.viewMode === "3d";
+        const showRegular = isOffice && state.viewMode === "regular";
+
+        document.getElementById("view-3d-wrapper").classList.toggle("hidden", !show3D);
+        document.getElementById("view-regular").classList.toggle("hidden", !showRegular);
+        document.getElementById("view-conference").classList.toggle("hidden", state.activeTab !== "conference");
+        document.getElementById("view-brain").classList.toggle("hidden", state.activeTab !== "brain");
+
+        // Top Mode Toggle Buttons
+        const btn3D = document.getElementById("modeBtn3D");
+        const btnReg = document.getElementById("modeBtnRegular");
+        btn3D.className =
+          state.viewMode === "3d"
+            ? "min-h-[34px] px-2.5 sm:px-3 py-1 rounded-xl text-xs font-extrabold transition flex items-center gap-1 bg-slate-900 text-white shadow-sm"
+            : "min-h-[34px] px-2.5 sm:px-3 py-1 rounded-xl text-xs font-bold transition flex items-center gap-1 text-slate-600 hover:text-slate-900";
+        btnReg.className =
+          state.viewMode === "regular"
+            ? "min-h-[34px] px-2.5 sm:px-3 py-1 rounded-xl text-xs font-extrabold transition flex items-center gap-1 bg-slate-900 text-white shadow-sm"
+            : "min-h-[34px] px-2.5 sm:px-3 py-1 rounded-xl text-xs font-bold transition flex items-center gap-1 text-slate-600 hover:text-slate-900";
+
+        // Bottom Nav Active Styling
+        document.querySelectorAll("[data-tab]").forEach((btn) => {
+          const active = btn.getAttribute("data-tab") === state.activeTab;
+          btn.className = active
+            ? "nav-tab-btn min-h-[48px] rounded-2xl flex flex-col items-center justify-center gap-0.5 text-xs font-extrabold transition bg-indigo-50 text-indigo-700"
+            : "nav-tab-btn min-h-[48px] rounded-2xl flex flex-col items-center justify-center gap-0.5 text-xs font-bold transition text-slate-500 hover:bg-stone-100";
+        });
+
+        if (show3D) {
+          setTimeout(resizeThreeCanvas, 40);
+        }
+      }
+
+      function renderMetricsEverywhere() {
+        const t = getTotals();
+        const calPct = Math.min(100, Math.round((t.cal / t.targetCal) * 100));
+        const protPct = Math.min(100, Math.round((t.prot / t.targetProt) * 100));
+
+        // 3D HUD Pill
+        document.getElementById("hudCalText").textContent = `🔥 ${t.cal.toLocaleString()}/${t.targetCal.toLocaleString()}`;
+        document.getElementById("hudProtText").textContent = `💪 ${t.prot}/${t.targetProt}g`;
+        const hudTrekBtn = document.getElementById("hudTrekBtn");
+        document.getElementById("hudTrekLabel").textContent = state.nutrition.isTrekDay ? "טרק (2,900)" : "רגיל";
+        hudTrekBtn.className = state.nutrition.isTrekDay
+          ? "bg-amber-500/95 text-white backdrop-blur-md border border-amber-200/60 rounded-2xl px-2.5 py-2 text-[11px] font-extrabold shadow-lg flex items-center gap-1 transition active:scale-95"
+          : "bg-slate-900/80 hover:bg-slate-900 text-slate-200 backdrop-blur-md border border-white/15 rounded-2xl px-2.5 py-2 text-[11px] font-bold shadow-lg flex items-center gap-1 transition active:scale-95";
+
+        // Regular Mode Tracker
+        document.getElementById("regCalVal").textContent = t.cal.toLocaleString();
+        document.getElementById("regCalTarget").textContent = t.targetCal.toLocaleString();
+        document.getElementById("regCalBar").style.width = `${calPct}%`;
+        document.getElementById("regCalRemain").textContent =
+          t.remCal >= 0 ? `נותרו ${t.remCal.toLocaleString()} קק״ל ליעד` : `חריגה של ${Math.abs(t.remCal).toLocaleString()} קק״ל`;
+
+        document.getElementById("regProtVal").textContent = t.prot.toLocaleString();
+        document.getElementById("regProtTarget").textContent = t.targetProt.toLocaleString();
+        document.getElementById("regProtBar").style.width = `${protPct}%`;
+        document.getElementById("regProtRemain").textContent =
+          t.remProt >= 0 ? `נותרו ${t.remProt} גרם חלבון` : `הגעת ליעד החלבון (+${Math.abs(t.remProt)}g) ✓`;
+
+        document.getElementById("regMealsCount").textContent = state.nutrition.meals.length;
+
+        const regTrekBtn = document.getElementById("regTrekToggleBtn");
+        document.getElementById("regTrekLabel").textContent = state.nutrition.isTrekDay ? "יום טרק: פעיל (2,900)" : "מצב טרק: כבוי";
+        regTrekBtn.className = state.nutrition.isTrekDay
+          ? "min-h-[34px] px-2.5 py-1 rounded-xl text-xs font-extrabold border transition flex items-center gap-1 bg-amber-100 text-amber-900 border-amber-300"
+          : "min-h-[34px] px-2.5 py-1 rounded-xl text-xs font-bold border transition flex items-center gap-1 bg-stone-100 text-slate-700 border-stone-200";
+      }
+
+      function renderRegularAgentsGrid() {
+        const grid = document.getElementById("regularAgentsGrid");
+        grid.innerHTML = "";
+        const t = getTotals();
+
+        Object.values(AGENTS).forEach((ag) => {
+          const msgs = state.chats[ag.id] || [];
+          const lastAgentMsg = [...msgs].reverse().find((m) => m.sender === "agent");
+          const preview = lastAgentMsg ? lastAgentMsg.text.split("\n")[0] : ag.role;
+          const status = ag.id === "dan" ? `${t.cal}/${t.targetCal} קק״ל` : ag.statusText;
+
+          const card = document.createElement("article");
+          card.className = `bg-white rounded-3xl border ${ag.softBorder} p-4 shadow-xs flex flex-col justify-between gap-3 cursor-pointer hover:shadow-md transition active:scale-[0.99]`;
+          card.innerHTML = `
+            <div class="space-y-2">
+              <div class="flex items-start justify-between gap-2">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-10 h-10 rounded-2xl ${ag.badgeBg} text-white font-extrabold text-base flex items-center justify-center shadow-xs shrink-0">${ag.name[0]}</div>
+                  <div>
+                    <h3 class="font-display font-extrabold text-sm text-slate-900">${ag.fullName}</h3>
+                    <div class="text-[11px] text-slate-500">${ag.tone}</div>
+                  </div>
+                </div>
+                <span class="text-[10px] font-bold px-2.5 py-1 rounded-full ${ag.softBg} ${ag.softText} border ${ag.softBorder} shrink-0">${status}</span>
+              </div>
+              <p class="text-xs text-slate-600 line-clamp-2 leading-relaxed">${escapeHtml(preview)}</p>
+            </div>
+            <div class="pt-2 border-t border-stone-100 flex items-center justify-between text-xs">
+              <span class="text-[11px] text-slate-400 truncate max-w-[62%]">${ag.roomSign}</span>
+              <span class="font-extrabold ${ag.softText}">דבר עם ${ag.name} ←</span>
+            </div>`;
+          card.addEventListener("click", () => openAgentDrawer(ag.id));
+          grid.appendChild(card);
+        });
+
+        // Recent Activity Strip
+        const listEl = document.getElementById("regActivityList");
+        const entries = (state.files["brain/activity-log.md"] || "")
+          .split("\n")
+          .filter((l) => l.trim().startsWith("- "))
+          .slice(0, 4);
+        listEl.innerHTML = entries.map((e) => `<div class="truncate">• ${escapeHtml(e.replace(/^- /, ""))}</div>`).join("");
+      }
+
+      function renderAgentDrawer() {
+        if (!activeChatAgentId) return;
+        const ag = AGENTS[activeChatAgentId];
+        const t = getTotals();
+
+        const badge = document.getElementById("drawerAvatarBadge");
+        badge.className = `w-10 h-10 rounded-2xl ${ag.badgeBg} flex items-center justify-center text-white font-extrabold text-base shadow-sm shrink-0`;
+        badge.textContent = ag.name[0];
+
+        document.getElementById("drawerAgentName").textContent = ag.fullName;
+        document.getElementById("drawerTonePill").textContent = ag.tone;
+        document.getElementById("drawerAgentRole").textContent = ag.role;
+
+        // Context Strip
+        const strip = document.getElementById("drawerContextStrip");
+        if (ag.id === "dan") {
+          strip.innerHTML = `
+            <div class="font-bold text-emerald-900">🔥 ${t.cal}/${t.targetCal} קק״ל • 💪 ${t.prot}/${t.targetProt}g</div>
+            <div class="flex items-center gap-1.5">
+              <button type="button" id="ctxDanTrek" class="px-2.5 py-1 rounded-xl font-bold border ${state.nutrition.isTrekDay ? "bg-amber-100 text-amber-900 border-amber-300" : "bg-stone-100 text-slate-700 border-stone-200"}">🏔️ ${state.nutrition.isTrekDay ? "טרק פעיל" : "יום רגיל"}</button>
+              <button type="button" id="ctxDanMeals" class="px-2.5 py-1 rounded-xl font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">🍽️ ארוחות (${state.nutrition.meals.length})</button>
+            </div>`;
+          strip.querySelector("#ctxDanTrek").addEventListener("click", toggleTrekMode);
+          strip.querySelector("#ctxDanMeals").addEventListener("click", () => openMealsModal());
+        } else if (ag.id === "roee") {
+          strip.innerHTML = `
+            <span class="text-slate-600 font-semibold">פיצול והעברה כלשונה לצוות</span>
+            <label class="inline-flex items-center gap-1.5 cursor-pointer font-bold text-purple-800 bg-purple-50 px-2.5 py-1 rounded-xl border border-purple-200">
+              <input id="ctxRoeeAuto" type="checkbox" ${state.roeeAutoDispatch ? "checked" : ""} class="accent-purple-600 w-4 h-4" />
+              <span>⚡ הפעל עובדים אוטומטית</span>
+            </label>`;
+          strip.querySelector("#ctxRoeeAuto").addEventListener("change", (e) => {
+            state.roeeAutoDispatch = e.target.checked;
+            saveState();
+          });
+        } else if (ag.id === "tomer") {
+          strip.innerHTML = `<span class="font-bold text-orange-800">📍 מיקום: סוקרה, בוליביה</span><span class="text-slate-500">הבא: פוטוסי ← אויוני ← ארגנטינה</span>`;
+        } else {
+          strip.innerHTML = `<span class="font-bold text-blue-800">⏸️ מצב המתנה שקט בטיול</span><span class="text-slate-500">מסלול שש-שנתי • עברית רשמית</span>`;
+        }
+
+        // Quick Prompts
+        const qpRow = document.getElementById("drawerQuickPrompts");
+        qpRow.innerHTML = "";
+        ag.quickPrompts.forEach((qp) => {
+          const b = document.createElement("button");
+          b.type = "button";
+          b.className = "px-2.5 py-1.5 rounded-xl bg-white hover:bg-indigo-50 border border-stone-200 text-slate-700 font-bold text-xs shrink-0";
+          b.textContent = qp.label;
+          b.addEventListener("click", () => {
+            const inp = document.getElementById("drawerChatInput");
+            inp.value = qp.text;
+            inp.focus();
+          });
+          qpRow.appendChild(b);
+        });
+
+        // Messages
+        const feed = document.getElementById("drawerMessagesFeed");
+        feed.innerHTML = "";
+        (state.chats[ag.id] || []).forEach((m) => {
+          const row = document.createElement("div");
+          if (m.sender === "user") {
+            row.className = "flex justify-start";
+            row.innerHTML = `
+              <div class="max-w-[86%] bg-slate-900 text-white rounded-2xl rounded-tr-sm px-3.5 py-2.5 shadow-2xs space-y-1">
+                <div class="text-xs sm:text-sm whitespace-pre-line leading-relaxed">${escapeHtml(m.text)}</div>
+                <div class="text-[10px] text-slate-400 text-left">${escapeHtml(m.time)}</div>
+              </div>`;
+          } else {
+            row.className = "flex justify-end";
+            const bubble = document.createElement("div");
+            bubble.className = `max-w-[92%] bg-white border ${ag.softBorder} rounded-2xl rounded-tl-sm px-3.5 py-2.5 shadow-2xs space-y-2`;
+            bubble.innerHTML = `
+              <div class="flex items-center justify-between gap-3">
+                <span class="text-[11px] font-extrabold ${ag.softText}">${ag.name}</span>
+                <span class="text-[10px] text-slate-400">${escapeHtml(m.time)}</span>
+              </div>
+              <div class="text-xs sm:text-sm text-slate-800 whitespace-pre-line leading-relaxed">${escapeHtml(m.text)}</div>`;
+
+            // Dan logged meal undo/edit chip
+            if (ag.id === "dan" && m.loggedMealId) {
+              const meal = state.nutrition.meals.find((x) => x.id === m.loggedMealId);
+              const chip = document.createElement("div");
+              if (meal) {
+                chip.className = "bg-emerald-50 border border-emerald-200 rounded-xl p-2 flex flex-wrap items-center justify-between gap-2 text-[11px]";
+                chip.innerHTML = `
+                  <span class="font-bold text-emerald-900">✅ עודכן: ${escapeHtml(meal.name)} (${meal.calories} קק״ל | ${meal.protein}g)</span>
+                  <div class="flex gap-1">
+                    <button type="button" data-ed="${meal.id}" class="px-2 py-0.5 rounded-lg bg-white border border-emerald-300 text-emerald-800 font-bold">✏️</button>
+                    <button type="button" data-un="${meal.id}" class="px-2 py-0.5 rounded-lg bg-white border border-rose-200 text-rose-700 font-bold">בטל</button>
+                  </div>`;
+                chip.querySelector("[data-ed]").addEventListener("click", () => openMealsModal(meal.id));
+                chip.querySelector("[data-un]").addEventListener("click", () => {
+                  state.nutrition.meals = state.nutrition.meals.filter((x) => x.id !== meal.id);
+                  appendLog("דן", `בוטלה ארוחה "${meal.name}".`);
+                  saveState();
+                  renderAllUI();
+                });
+              } else {
+                chip.className = "text-[11px] text-slate-400 italic";
+                chip.textContent = "ארוחה זו הוסרה מהמונה היומי.";
+              }
+              bubble.appendChild(chip);
+            }
+
+            // Roee routed task cards
+            if (ag.id === "roee" && Array.isArray(m.routedTasks) && m.routedTasks.length > 0) {
+              const wrap = document.createElement("div");
+              wrap.className = "space-y-1.5 pt-1";
+              m.routedTasks.forEach((rt) => {
+                const target = AGENTS[rt.agentId];
+                if (!target) return;
+                const box = document.createElement("div");
+                box.className = `${target.softBg} border ${target.softBorder} rounded-xl p-2.5 text-xs space-y-1.5`;
+                box.innerHTML = `
+                  <div class="flex items-center justify-between gap-2">
+                    <span class="font-extrabold ${target.softText}">➡️ הועבר אל ${target.name}</span>
+                    ${
+                      rt.dispatched
+                        ? `<button type="button" data-go="${target.id}" class="px-2 py-0.5 rounded-lg bg-white border ${target.softBorder} ${target.softText} font-bold text-[11px]">פתח שיחה ←</button>`
+                        : `<button type="button" data-run="${rt.id}" class="px-2 py-0.5 rounded-lg ${target.badgeBg} text-white font-bold text-[11px]">הפעל עכשיו</button>`
+                    }
+                  </div>
+                  ${rt.dispatched && rt.summary ? `<div class="text-[11px] text-slate-800 bg-white/85 rounded-lg p-2 whitespace-pre-line">${escapeHtml(rt.summary)}</div>` : ""}`;
+                const goBtn = box.querySelector("[data-go]");
+                if (goBtn) goBtn.addEventListener("click", () => openAgentDrawer(target.id));
+                const runBtn = box.querySelector("[data-run]");
+                if (runBtn) {
+                  runBtn.addEventListener("click", async () => {
+                    runBtn.disabled = true;
+                    const res = await executeAgentMessage(rt.agentId, rt.verbatimTask, { appendUser: true });
+                    rt.dispatched = true;
+                    rt.summary = res?.text || "בוצע.";
+                    saveState();
+                    renderAllUI();
+                  });
+                }
+                wrap.appendChild(box);
+              });
+              bubble.appendChild(wrap);
+            }
+
+            row.appendChild(bubble);
+          }
+          feed.appendChild(row);
+        });
+        feed.scrollTop = feed.scrollHeight;
+      }
+
+      function renderConferenceUI() {
+        const row = document.getElementById("confParticipantsRow");
+        row.innerHTML = "";
+        Object.values(AGENTS).forEach((ag) => {
+          const active = state.conference.participants.includes(ag.id);
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.disabled = isConferenceBusy;
+          btn.className = active
+            ? `min-h-[32px] px-2.5 py-1 rounded-full text-xs font-extrabold border ${ag.softBg} ${ag.softText} ${ag.softBorder}`
+            : "min-h-[32px] px-2.5 py-1 rounded-full text-xs font-semibold border border-stone-200 bg-white text-slate-400";
+          btn.textContent = `${active ? "✓" : "+"} ${ag.name}`;
+          btn.addEventListener("click", () => {
+            if (active && state.conference.participants.length <= 1) return;
+            state.conference.participants = active
+              ? state.conference.participants.filter((x) => x !== ag.id)
+              : [...state.conference.participants, ag.id];
+            saveState();
+            renderConferenceUI();
+          });
+          row.appendChild(btn);
+        });
+
+        const feed = document.getElementById("confMessagesFeed");
+        feed.innerHTML = "";
+        state.conference.messages.forEach((m) => {
+          const div = document.createElement("div");
+          if (m.senderType === "system") {
+            div.className = "text-center text-xs text-slate-500 bg-linen rounded-2xl px-3 py-2 border border-stone-200";
+            div.textContent = m.text;
+          } else if (m.senderType === "user") {
+            div.className = "flex justify-start";
+            div.innerHTML = `
+              <div class="max-w-[88%] bg-slate-900 text-white rounded-2xl rounded-tr-sm px-3.5 py-2.5 space-y-1">
+                <div class="text-[10px] text-slate-300 font-bold flex justify-between gap-3"><span>${escapeHtml(m.senderName)}</span><span>${escapeHtml(m.time)}</span></div>
+                <div class="text-xs sm:text-sm whitespace-pre-line">${escapeHtml(m.text)}</div>
+              </div>`;
+          } else {
+            const ag = AGENTS[m.senderId] || AGENTS.roee;
+            div.className = "flex items-start gap-2";
+            div.innerHTML = `
+              <div class="w-8 h-8 rounded-xl ${ag.badgeBg} text-white font-extrabold text-xs flex items-center justify-center shrink-0 mt-0.5">${ag.name[0]}</div>
+              <div class="flex-1 bg-white border ${ag.softBorder} rounded-2xl rounded-tl-sm px-3 py-2 shadow-2xs space-y-1">
+                <div class="flex justify-between text-[11px]"><span class="font-extrabold ${ag.softText}">${ag.fullName}</span><span class="text-slate-400">${escapeHtml(m.time)}</span></div>
+                <div class="text-xs sm:text-sm text-slate-800 whitespace-pre-line leading-relaxed">${escapeHtml(m.text)}</div>
+              </div>`;
+          }
+          feed.appendChild(div);
+        });
+        feed.scrollTop = feed.scrollHeight;
+      }
+
+      function renderBrainUI() {
+        const tabs = document.getElementById("brainTabsRow");
+        tabs.innerHTML = "";
+        Object.keys(state.files).forEach((key) => {
+          const active = key === activeBrainFile;
+          const b = document.createElement("button");
+          b.type = "button";
+          b.setAttribute("dir", "ltr");
+          b.className = active
+            ? "min-h-[34px] px-3 py-1 rounded-xl text-xs font-mono font-extrabold bg-indigo-600 text-white shrink-0"
+            : "min-h-[34px] px-3 py-1 rounded-xl text-xs font-mono font-semibold bg-linen text-slate-700 border border-stone-200 shrink-0";
+          b.textContent = key;
+          b.addEventListener("click", () => {
+            activeBrainFile = key;
+            renderBrainUI();
+          });
+          tabs.appendChild(b);
+        });
+        document.getElementById("brainFileTitle").textContent = activeBrainFile;
+        document.getElementById("brainEditorTextarea").value = state.files[activeBrainFile] || "";
+        document.getElementById("settingApiKeyInput").value = state.userApiKey || "";
+      }
+
+      function renderMealsModal(editId = null) {
+        const t = getTotals();
+        document.getElementById("mealsModalMeta").textContent =
+          `סה״כ: ${t.cal.toLocaleString()}/${t.targetCal.toLocaleString()} קק״ל • ${t.prot}/${t.targetProt}g חלבון`;
+        const list = document.getElementById("mealsListContainer");
+        list.innerHTML = "";
+
+        if (!state.nutrition.meals.length) {
+          list.innerHTML = `<div class="text-center py-6 text-xs text-slate-400">טרם נרשמו ארוחות היום. רשום למעלה או דבר עם דן.</div>`;
+        } else {
+          state.nutrition.meals.forEach((meal) => {
+            const row = document.createElement("div");
+            row.className = "bg-linen/80 border border-stone-200 rounded-2xl p-2.5 flex items-center justify-between gap-2";
+            row.innerHTML = `
+              <div class="min-w-0">
+                <div class="text-xs font-bold text-slate-900 truncate">${escapeHtml(meal.name)}</div>
+                <div class="text-[11px] text-slate-600">${meal.calories} קק״ל • ${meal.protein}g חלבון • ${escapeHtml(meal.time)}</div>
+              </div>
+              <div class="flex items-center gap-1 shrink-0">
+                <button type="button" data-me="${meal.id}" class="min-h-[32px] px-2 rounded-xl bg-white border border-stone-200 text-xs">✏️</button>
+                <button type="button" data-md="${meal.id}" class="min-h-[32px] px-2 rounded-xl bg-white border border-stone-200 text-xs text-rose-600">🗑️</button>
+              </div>`;
+            row.querySelector("[data-me]").addEventListener("click", () => beginEditMeal(meal));
+            row.querySelector("[data-md]").addEventListener("click", () => {
+              state.nutrition.meals = state.nutrition.meals.filter((x) => x.id !== meal.id);
+              appendLog("דן", `נמחקה הארוחה "${meal.name}".`);
+              saveState();
+              renderAllUI();
+              renderMealsModal();
+            });
+            list.appendChild(row);
+          });
+        }
+
+        if (editId) {
+          const found = state.nutrition.meals.find((m) => m.id === editId);
+          if (found) beginEditMeal(found);
+        }
+      }
+
+      function beginEditMeal(meal) {
+        document.getElementById("editMealId").value = meal.id;
+        document.getElementById("editMealName").value = meal.name;
+        document.getElementById("editMealCal").value = meal.calories;
+        document.getElementById("editMealProt").value = meal.protein;
+        document.getElementById("editMealForm").classList.remove("hidden");
+      }
+
+      function renderAllUI() {
+        applyViewAndTabVisibility();
+        renderMetricsEverywhere();
+        renderRegularAgentsGrid();
+        renderConferenceUI();
+        renderBrainUI();
+        if (activeChatAgentId) renderAgentDrawer();
+      }
+
+      // ===============================================================
+      // G. DRAWERS, MODALS & ACTIONS
+      // ===============================================================
+      function switchMainTab(tabName) {
+        state.activeTab = tabName;
+        saveState();
+        applyViewAndTabVisibility();
+        if (tabName === "conference") renderConferenceUI();
+        if (tabName === "brain") renderBrainUI();
+      }
+
+      function switchViewMode(mode) {
+        state.viewMode = mode;
+        state.activeTab = "office";
+        saveState();
+        applyViewAndTabVisibility();
+      }
+
+      function openAgentDrawer(agentId) {
+        activeChatAgentId = agentId;
+        const d = document.getElementById("agentChatDrawer");
+        d.classList.remove("hidden");
+        d.classList.add("flex");
+        renderAgentDrawer();
+      }
+
+      function closeAgentDrawer() {
+        activeChatAgentId = null;
+        const d = document.getElementById("agentChatDrawer");
+        d.classList.add("hidden");
+        d.classList.remove("flex");
+      }
+
+      function setDrawerTyping(show, text = "כותב...") {
+        const bar = document.getElementById("drawerTypingBar");
+        document.getElementById("drawerTypingText").textContent = text;
+        bar.classList.toggle("hidden", !show);
+        bar.classList.toggle("flex", show);
+        document.getElementById("drawerSendBtn").disabled = show;
+      }
+
+      function setConfSpeakingBanner(show, text = "") {
+        const b = document.getElementById("confSpeakingBanner");
+        document.getElementById("confSpeakingText").textContent = text;
+        b.classList.toggle("hidden", !show);
+        b.classList.toggle("flex", show);
+      }
+
+      function setConfBusyUI(busy) {
+        ["confSendBtn", "cmdDailyCheckin", "cmdWeeklyReview", "cmdRouteStrategy"].forEach((id) => {
+          const el = document.getElementById(id);
+          if (el) el.disabled = busy;
+        });
+      }
+
+      function openMealsModal(editMealId = null) {
+        document.getElementById("editMealForm").classList.add("hidden");
+        renderMealsModal(editMealId);
+        const m = document.getElementById("mealsModal");
+        m.classList.remove("hidden");
+        m.classList.add("flex");
+      }
+
+      function closeMealsModal() {
+        const m = document.getElementById("mealsModal");
+        m.classList.add("hidden");
+        m.classList.remove("flex");
+      }
+
+      function toggleTrekMode() {
+        state.nutrition.isTrekDay = !state.nutrition.isTrekDay;
+        appendLog("דן", state.nutrition.isTrekDay ? "הופעל מצב טרק (2,900 קק״ל)." : "חזרנו ליום רגיל (2,400 קק״ל).");
+        saveState();
+        renderAllUI();
+      }
+
+      function requestNewDayReset() {
+        const t = getTotals();
+        openConfirm({
+          icon: "🌅",
+          title: "התחלת יום חדש?",
+          body: `איפוס מונה היום (${t.cal} קק״ל ו-${t.prot}g חלבון) ל-0 ושמירת סיכום קצר ביומן הפעילות.`,
+          okLabel: "אפס ליום חדש",
+          onConfirm: () => {
+            state.nutrition.meals = [];
+            appendLog("דן", `יום חדש אופס (סיכום קודם: ${t.cal} קק״ל, ${t.prot}g חלבון).`);
+            saveState();
+            renderAllUI();
+          }
+        });
+      }
+
+      // ===============================================================
+      // H. EVENT WIRING
+      // ===============================================================
+      // Header 3D / Regular Toggle
+      document.getElementById("modeBtn3D").addEventListener("click", () => switchViewMode("3d"));
+      document.getElementById("modeBtnRegular").addEventListener("click", () => switchViewMode("regular"));
+      document.getElementById("switchTo3dFromRegBtn").addEventListener("click", () => switchViewMode("3d"));
+
+      // Bottom Nav Tabs
+      document.querySelectorAll("[data-tab]").forEach((btn) => {
+        btn.addEventListener("click", () => switchMainTab(btn.getAttribute("data-tab")));
+      });
+
+      // 3D Camera Presets
+      document.querySelectorAll("[data-cam-preset]").forEach((btn) => {
+        btn.addEventListener("click", () => setCameraPreset(btn.getAttribute("data-cam-preset")));
+      });
+
+      // 3D HUD Actions
+      document.getElementById("hudNutritionPill").addEventListener("click", () => openMealsModal());
+      document.getElementById("hudTrekBtn").addEventListener("click", toggleTrekMode);
+      document.getElementById("hudOpenConfChatBtn").addEventListener("click", () => switchMainTab("conference"));
+
+      // Regular Mode Actions
+      document.getElementById("regTrekToggleBtn").addEventListener("click", toggleTrekMode);
+      document.getElementById("regResetDayBtn").addEventListener("click", requestNewDayReset);
+      document.getElementById("regQuickMealBtn").addEventListener("click", () => openMealsModal());
+      document.getElementById("regMealsLogBtn").addEventListener("click", () => openMealsModal());
+      document.getElementById("regEnterConferenceBtn").addEventListener("click", () => switchMainTab("conference"));
+      document.getElementById("regGoBrainBtn").addEventListener("click", () => switchMainTab("brain"));
+
+      // Agent Chat Drawer Events
+      document.getElementById("closeChatDrawerBtn").addEventListener("click", closeAgentDrawer);
+      document.getElementById("agentChatDrawer").addEventListener("click", (e) => {
+        if (e.target.id === "agentChatDrawer") closeAgentDrawer();
+      });
+      document.getElementById("drawerChatForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        if (!activeChatAgentId) return;
+        const inp = document.getElementById("drawerChatInput");
+        const val = inp.value.trim();
+        if (!val) return;
+        inp.value = "";
+        await executeAgentMessage(activeChatAgentId, val);
+      });
+
+      // Meals Modal Events
+      document.getElementById("closeMealsModalBtn").addEventListener("click", closeMealsModal);
+      document.getElementById("mealsModal").addEventListener("click", (e) => {
+        if (e.target.id === "mealsModal") closeMealsModal();
+      });
+      document.getElementById("mealsModalTrekBtn").addEventListener("click", () => {
+        toggleTrekMode();
+        renderMealsModal();
+      });
+      document.getElementById("mealsModalChatDanBtn").addEventListener("click", () => {
+        closeMealsModal();
+        openAgentDrawer("dan");
+      });
+      document.getElementById("quickAddMealForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const inp = document.getElementById("quickMealDescInput");
+        const text = inp.value.trim();
+        if (!text) return;
+        inp.value = "";
+        await executeAgentMessage("dan", `אכלתי ${text}`);
+        renderMealsModal();
+      });
+      document.getElementById("cancelEditMealBtn").addEventListener("click", () => {
+        document.getElementById("editMealForm").classList.add("hidden");
+      });
+      document.getElementById("editMealForm").addEventListener("submit", (e) => {
+        e.preventDefault();
+        const id = document.getElementById("editMealId").value;
+        const m = state.nutrition.meals.find((x) => x.id === id);
+        if (m) {
+          m.name = document.getElementById("editMealName").value.trim() || m.name;
+          m.calories = Math.max(0, Number(document.getElementById("editMealCal").value) || 0);
+          m.protein = Math.max(0, Number(document.getElementById("editMealProt").value) || 0);
+          appendLog("דן", `עודכנה ארוחה "${m.name}" (${m.calories} קק״ל, ${m.protein}g חלבון).`);
+          saveState();
+          renderAllUI();
+          renderMealsModal();
+        }
+        document.getElementById("editMealForm").classList.add("hidden");
+      });
+
+      // Conference Room Events
+      document.getElementById("confJump3dBtn").addEventListener("click", () => {
+        switchViewMode("3d");
+        setCameraPreset("conference");
+      });
+      document.getElementById("cmdDailyCheckin").addEventListener("click", () => {
+        runConferenceSession({
+          title: "☀️ /daily-checkin",
+          prompt: "צ׳ק-אין יומי קצר לאייפון: דן מסכם קלוריות/חלבון, תומר נותן דגש לוגיסטי אחד לסוקרה.",
+          overrideParticipants: ["dan", "tomer"],
+          logLabel: "צ׳ק-אין יומי"
+        });
+      });
+      document.getElementById("cmdWeeklyReview").addEventListener("click", () => {
+        runConferenceSession({
+          title: "📊 /weekly-review",
+          prompt: "סיכום שבועי מרוכז: מה נעשה השבוע, מה דורש החלטה ומה התוכנית לשבוע הבא.",
+          overrideParticipants: null,
+          logLabel: "סיכום שבועי"
+        });
+      });
+      document.getElementById("cmdRouteStrategy").addEventListener("click", () => {
+        const inp = document.getElementById("confChatInput");
+        inp.value = "איך מתארגנים נכון על מעבר מסוקרה לפוטוסי וסלאר דה אויוני תוך שמירה על 180 גרם חלבון?";
+        inp.focus();
+      });
+      document.getElementById("cmdClearConf").addEventListener("click", () => {
+        state.conference.messages = [
+          { id: "c-clr-" + Date.now(), senderType: "system", senderId: "system", senderName: "חדר ישיבות", text: "התצוגה נוקתה. הסיכומים שמורים ביומן הפעילות.", time: getNowTime() }
+        ];
+        saveState();
+        renderConferenceUI();
+      });
+      document.getElementById("confChatForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const inp = document.getElementById("confChatInput");
+        const txt = inp.value.trim();
+        if (!txt) return;
+        inp.value = "";
+        await runConferenceSession({ title: "🎯 דיון קבוצתי", prompt: txt, logLabel: "ישיבת אסטרטגיה" });
+      });
+
+      // Brain & Settings Events
+      document.getElementById("settingTiinyToggle").addEventListener("change", (e) => {
+        state.tiinySpacerEnabled = e.target.checked;
+        saveState();
+        applyTiinyOffsetSetting();
+      });
+
+      document.getElementById("saveApiKeyBtn").addEventListener("click", () => {
+        state.userApiKey = document.getElementById("settingApiKeyInput").value.trim();
+        saveState();
+        updateAiStatusBadge(false);
+        const toast = document.getElementById("brainSavedToast");
+        toast.textContent = state.userApiKey ? "מפתח נשמר ✓" : "מפתח נוקה";
+        toast.classList.remove("opacity-0");
+        setTimeout(() => toast.classList.add("opacity-0"), 2000);
+      });
+
+      document.getElementById("saveBrainBtn").addEventListener("click", () => {
+        state.files[activeBrainFile] = document.getElementById("brainEditorTextarea").value;
+        if (activeBrainFile !== "brain/activity-log.md") {
+          appendLog("מערכת", `עודכן הקובץ ${activeBrainFile}.`);
+        }
+        saveState();
+        renderAllUI();
+        const toast = document.getElementById("brainSavedToast");
+        toast.textContent = "נשמר ✓";
+        toast.classList.remove("opacity-0");
+        setTimeout(() => toast.classList.add("opacity-0"), 2000);
+      });
+
+      document.getElementById("openFactoryResetBtn").addEventListener("click", () => {
+        openConfirm({
+          icon: "⚠️",
+          title: "איפוס כללי של המשרד?",
+          body: "פעולה זו תאפס את השיחות, ארוחות היום וקבצי המוח לערכי הפתיחה (סוקרה, 2,400 קק״ל ו-180 ג׳ חלבון).",
+          okLabel: "אפס הכול",
+          onConfirm: () => {
+            const keepKey = state.userApiKey;
+            const keepTiiny = state.tiinySpacerEnabled;
+            state = createDefaultState();
+            state.userApiKey = keepKey;
+            state.tiinySpacerEnabled = keepTiiny;
+            saveState();
+            renderAllUI();
+          }
+        });
+      });
+
+      // Confirm Modal Wiring
+      document.getElementById("confirmCancelBtn").addEventListener("click", closeConfirm);
+      document.getElementById("confirmOkBtn").addEventListener("click", () => {
+        const fn = confirmCallback;
+        closeConfirm();
+        if (typeof fn === "function") fn();
+      });
+
+      // Resize Listener
+      window.addEventListener("resize", resizeThreeCanvas);
+
+      // ===============================================================
+      // I. BOOTSTRAP ON WINDOW LOAD (SAFE FOR THREE.JS ANIMATION LOOP)
+      // ===============================================================
+      window.onload = function () {
+        applyTiinyOffsetSetting();
+        updateAiStatusBadge(false);
+        renderAllUI();
+        initThreeScene();
+        animate3D();
+      };
+    })();
+  </script>
+</body>
+</html>
